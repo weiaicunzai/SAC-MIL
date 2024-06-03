@@ -60,42 +60,42 @@ def setup(args):
     num_classes = 10
 
     model = MlpMixer(config, args.img_size, num_classes=num_classes, patch_size=16, zero_head=True)
-    # if args.pretrained_dir:
-    #     print(f"Loading pretrained model from {args.pretrained_dir}")
-    #     try:
-    #         pretrained_data = np.load(args.pretrained_dir)
-    #         model.load_from(pretrained_data)
-    #     except Exception as e:
-    #         print(f"Error loading pretrained model: {e}")
-    # else:
-    #     print("No pretrained directory provided")
-    # if args.pretrained_dir:
-    #     print(f"Loading pretrained model from {args.pretrained_dir}")
-    #     if not os.path.isfile(args.pretrained_dir):
-    #         raise FileNotFoundError(f"File {args.pretrained_dir} does not exist")
-    #
-    #     if args.pretrained_dir.endswith('.npz'):
-    #         try:
-    #             pretrained_data = np.load(args.pretrained_dir)
-    #             model.load_from(pretrained_data)
-    #         except Exception as e:
-    #             print(f"Error loading pretrained model: {e}")
-    #     else:
-    #         print(f"Expected a .npz file, but got {args.pretrained_dir}")
-    # else:
-    #     print("No pretrained directory provided")
-    # if args.pretrained_dir:
-    #     print(f"Loading pretrained model from {args.pretrained_dir}")
-    #     try:
-    #         pretrained_data = np.load(args.pretrained_dir, allow_pickle=True)
-    #         model.load_from(pretrained_data)
-    #     except Exception as e:
-    #         print(f"Error loading pretrained model: {e}")
-    # else:
-    #     print("No pretrained directory provided")
+    if args.pretrained_dir:
+        print(f"Loading pretrained model from {args.pretrained_dir}")
+        try:
+            pretrained_data = np.load(args.pretrained_dir)
+            model.load_from(pretrained_data)
+        except Exception as e:
+            print(f"Error loading pretrained model: {e}")
+    else:
+        print("No pretrained directory provided")
+    if args.pretrained_dir:
+        print(f"Loading pretrained model from {args.pretrained_dir}")
+        if not os.path.isfile(args.pretrained_dir):
+            raise FileNotFoundError(f"File {args.pretrained_dir} does not exist")
+
+        if args.pretrained_dir.endswith('.npz'):
+            try:
+                pretrained_data = np.load(args.pretrained_dir)
+                model.load_from(pretrained_data)
+            except Exception as e:
+                print(f"Error loading pretrained model: {e}")
+        else:
+            print(f"Expected a .npz file, but got {args.pretrained_dir}")
+    else:
+        print("No pretrained directory provided")
+    if args.pretrained_dir:
+        print(f"Loading pretrained model from {args.pretrained_dir}")
+        try:
+            pretrained_data = np.load(args.pretrained_dir, allow_pickle=True)
+            model.load_from(pretrained_data)
+        except Exception as e:
+            print(f"Error loading pretrained model: {e}")
+    else:
+        print("No pretrained directory provided")
 
     print("路径是：", args.pretrained_dir)
-    model.load_from(np.load(args.pretrained_dir))
+    # model.load_from(np.load(args.pretrained_dir))
     model.to(args.device)
     num_params = count_parameters(model)
 
@@ -138,7 +138,7 @@ def valid(args, model, writer, test_loader, global_step):
         batch = tuple(t.to(args.device) for t in batch)
         x, y = batch
         with torch.no_grad():
-            logits = model(x)[0]
+            logits = model(x)
 
             eval_loss = loss_fct(logits, y)
             eval_losses.update(eval_loss.item())
@@ -225,6 +225,7 @@ def train(args, model):
         for step, batch in enumerate(epoch_iterator):
             batch = tuple(t.to(args.device) for t in batch)
             x, y = batch
+            # print(x.shape, y.shape)
             loss = model(x, y)
 
             if args.gradient_accumulation_steps > 1:
@@ -280,7 +281,7 @@ def main():
                                                  "Mixer-B_16-21k", "Mixer-L_16-21k"],
                         default="Mixer-B_16",
                         help="Which model to use.")
-    parser.add_argument("--pretrained_dir", type=str, default="/home/xuxinan/MLP-M1/MLP-Mixer-Pytorch/Mixer-B_16.npz",
+    parser.add_argument("--pretrained_dir", type=str, default="Mixer-B_16.npz",
                         help="Where to search for pretrained ViT models.")
     parser.add_argument("--output_dir", default="output", type=str,
                         help="The output directory where checkpoints will be written.")

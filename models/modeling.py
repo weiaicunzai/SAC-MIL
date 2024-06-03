@@ -106,6 +106,7 @@ class MlpMixer(nn.Module):
 
         self.layer = nn.ModuleList()
         for _ in range(config.num_blocks):
+        # for _ in range(1):
             layer = MixerBlock(config)
             self.layer.append(copy.deepcopy(layer))
 
@@ -120,6 +121,10 @@ class MlpMixer(nn.Module):
         x = torch.mean(x, dim=1)
         logits = self.head(x)
 
+        # print(logits)
+        # print(logits.shape, logits.view(-1, self.num_classes).shape, labels.view(-1).shape)
+        # torch.Size([128, 3, 224, 224]) torch.Size([128])
+        # print(logits.shape)
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
             loss = loss_fct(logits.view(-1, self.num_classes), labels.view(-1))
