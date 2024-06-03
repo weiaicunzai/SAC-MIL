@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+import math
 
 #voc2012 bgr
 
@@ -15,19 +16,9 @@ DATE_FORMAT = '%A_%d_%B_%Y_%Hh_%Mm_%Ss'
 TIME_NOW = datetime.now().strftime(DATE_FORMAT)
 
 #save weights file per SAVE_EPOCH epoch
-SAVE_EPOCH = 10
 
-DATA_PATH = '/content/drive/My Drive/dataset/camvid'
+DATA_ROOT = '/data/smb/syh/WSI_cls/'
 
-IMAGE_SIZE = (480, 360)
-
-MILESTONES = [100, 150]
-
-IGNORE_LABEL = 255
-
-EPOCHS = 200
-
-
-TRAINING_LIST = '/home/baiyu/WorkSpace/vim_configure/training_list'
-
-ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+cam16_max_len = 44380
+cam16_num_seg = 256
+cam16_wsi_len = math.ceil(cam16_max_len / cam16_num_seg) * cam16_num_seg

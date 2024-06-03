@@ -4,6 +4,9 @@ from __future__ import absolute_import, division, print_function
 import logging
 import argparse
 import os
+import sys
+sys.path.append(os.getcwd())
+
 import random
 import numpy as np
 
@@ -19,6 +22,9 @@ from models.modeling import MlpMixer, CONFIGS
 from utils.scheduler import WarmupLinearSchedule, WarmupCosineSchedule
 from utils.data_utils import get_loader
 from utils.dist_utils import get_world_size
+
+# from conf.settings import co
+from conf import settings
 
 
 logger = logging.getLogger(__name__)
@@ -59,42 +65,51 @@ def setup(args):
 
     num_classes = 10
 
-    model = MlpMixer(config, args.img_size, num_classes=num_classes, patch_size=16, zero_head=True)
-    if args.pretrained_dir:
-        print(f"Loading pretrained model from {args.pretrained_dir}")
-        try:
-            pretrained_data = np.load(args.pretrained_dir)
-            model.load_from(pretrained_data)
-        except Exception as e:
-            print(f"Error loading pretrained model: {e}")
-    else:
-        print("No pretrained directory provided")
-    if args.pretrained_dir:
-        print(f"Loading pretrained model from {args.pretrained_dir}")
-        if not os.path.isfile(args.pretrained_dir):
-            raise FileNotFoundError(f"File {args.pretrained_dir} does not exist")
+    if args.dataset_name == 'cam16':
+        wsi_len = settings.cam16_wsi_len
 
-        if args.pretrained_dir.endswith('.npz'):
-            try:
-                pretrained_data = np.load(args.pretrained_dir)
-                model.load_from(pretrained_data)
-            except Exception as e:
-                print(f"Error loading pretrained model: {e}")
-        else:
-            print(f"Expected a .npz file, but got {args.pretrained_dir}")
-    else:
-        print("No pretrained directory provided")
-    if args.pretrained_dir:
-        print(f"Loading pretrained model from {args.pretrained_dir}")
-        try:
-            pretrained_data = np.load(args.pretrained_dir, allow_pickle=True)
-            model.load_from(pretrained_data)
-        except Exception as e:
-            print(f"Error loading pretrained model: {e}")
-    else:
-        print("No pretrained directory provided")
+    model = MlpMixer(
+        input_dim=1024,
+        hidden_dim=512,
+        seq_len=wsi_len,
+        reduced_token_dim=256,
+        channel_dim=
+    )
+    # if args.pretrained_dir:
+    #     print(f"Loading pretrained model from {args.pretrained_dir}")
+    #     try:
+    #         pretrained_data = np.load(args.pretrained_dir)
+    #         model.load_from(pretrained_data)
+    #     except Exception as e:
+    #         print(f"Error loading pretrained model: {e}")
+    # else:
+    #     print("No pretrained directory provided")
+    # if args.pretrained_dir:
+    #     print(f"Loading pretrained model from {args.pretrained_dir}")
+    #     if not os.path.isfile(args.pretrained_dir):
+    #         raise FileNotFoundError(f"File {args.pretrained_dir} does not exist")
 
-    print("路径是：", args.pretrained_dir)
+    #     if args.pretrained_dir.endswith('.npz'):
+    #         try:
+    #             pretrained_data = np.load(args.pretrained_dir)
+    #             model.load_from(pretrained_data)
+    #         except Exception as e:
+    #             print(f"Error loading pretrained model: {e}")
+    #     else:
+    #         print(f"Expected a .npz file, but got {args.pretrained_dir}")
+    # else:
+    #     print("No pretrained directory provided")
+    # if args.pretrained_dir:
+    #     print(f"Loading pretrained model from {args.pretrained_dir}")
+    #     try:
+    #         pretrained_data = np.load(args.pretrained_dir, allow_pickle=True)
+    #         model.load_from(pretrained_data)
+    #     except Exception as e:
+    #         print(f"Error loading pretrained model: {e}")
+    # else:
+    #     print("No pretrained directory provided")
+
+    # print("路径是：", args.pretrained_dir)
     # model.load_from(np.load(args.pretrained_dir))
     model.to(args.device)
     num_params = count_parameters(model)
@@ -186,6 +201,8 @@ def train(args, model):
                                 lr=args.learning_rate,
                                 momentum=0.9,
                                 weight_decay=args.weight_decay)
+
+    print('total number of parameters', sum([p.numel() for p in model.parameters()]))
     t_total = args.num_steps
     if args.decay_type == "cosine":
         scheduler = WarmupCosineSchedule(optimizer, warmup_steps=args.warmup_steps, t_total=t_total)
@@ -275,6 +292,10 @@ def train(args, model):
 def main():
     parser = argparse.ArgumentParser()
     # Required parameters
+    parser.add_argument("--data_root", default='/data/smb/syh/WSI_cls/')
+    # parser.add_args
+    parser.add_argument('--dataset_name', required=True, type=str)
+    parser.add_argument('--fold', required=True, type=int)
     parser.add_argument("--name", required=True,
                         help="Name of this run. Used for monitoring.")
     parser.add_argument("--model_type", choices=["Mixer-B_16", "Mixer-L_16",
