@@ -113,14 +113,14 @@ metrics = torchmetrics.MetricCollection([
             ]
         )
 
-def pad_seq(self, features):
-        fact = self.wsi_len / features.shape[1] + 1
+def pad_seq(features, wsi_len):
+        fact = wsi_len / features.shape[0] + 1
 
-        features = features.repeat(1, int(fact), 1)
+        features = features.repeat(int(fact), 1)
 
-        features = features[:, :self.wsi_len, :]
+        features = features[:wsi_len, :]
 
-        assert features.shape[1] == self.wsi_len
+        assert features.shape[0] == wsi_len
 
         return features
 
@@ -130,6 +130,8 @@ def load_feat(slide_id, feat_path):
     index = [x for x in range(feat.shape[0])]
     random.shuffle(index)
     feat = feat[index]
+
+    feat = pad_seq(feat, wsi_len=44380)
 
     return feat
 
@@ -190,11 +192,14 @@ def main():
     trainable_parameters += list(classifier.parameters())
     trainable_parameters += list(attention.parameters())
     trainable_parameters += list(dimReduction.parameters())
+    trainable_parameters += list(attCls.parameters())
 
-    optimizer_adam0 = torch.optim.Adam(trainable_parameters, lr=params.lr,  weight_decay=params.weight_decay)
+    # optimizer_adam0 = torch.optim.Adam(trainable_parameters, lr=params.lr,  weight_decay=params.weight_decay)
+    print(params.lr, params.weight_decay)
     optimizer_adam1 = torch.optim.Adam(attCls.parameters(), lr=params.lr,  weight_decay=params.weight_decay)
 
-    scheduler0 = torch.optim.lr_scheduler.MultiStepLR(optimizer_adam0, epoch_step, gamma=params.lr_decay_ratio)
+    # scheduler0 = torch.optim.lr_scheduler.MultiStepLR(optimizer_adam0, epoch_step, gamma=params.lr_decay_ratio)
+    print(epoch_step, params.lr_decay_ratio, params.EPOCH)
     scheduler1 = torch.optim.lr_scheduler.MultiStepLR(optimizer_adam1, epoch_step, gamma=params.lr_decay_ratio)
 
     best_auc = 0
@@ -211,7 +216,8 @@ def main():
                                                 #    optimizer0=optimizer_adam0, optimizer1=optimizer_adam1, epoch=ii, params=params, f_log=log_file, writer=writer, numGroup=params.numGroup, total_instance=params.total_instance, distill=params.distill_type)
 
         train_attention_preFeature_DTFD(classifier=classifier, dimReduction=dimReduction, attention=attention, UClassifier=attCls, mDATA_list=(SlideNames_train), ce_cri=ce_cri,
-                                                   optimizer0=optimizer_adam0, optimizer1=optimizer_adam1, epoch=ii, params=params, f_log=log_file, writer=writer, numGroup=params.numGroup, total_instance=params.total_instance, distill=params.distill_type, feat_path=feat_path)
+                                                #    optimizer0=optimizer_adam0, optimizer1=optimizer_adam1, epoch=ii, params=params, f_log=log_file, writer=writer, numGroup=params.numGroup, total_instance=params.total_instance, distill=params.distill_type, feat_path=feat_path)
+                                                   optimizer0=None, optimizer1=optimizer_adam1, epoch=ii, params=params, f_log=log_file, writer=writer, numGroup=params.numGroup, total_instance=params.total_instance, distill=params.distill_type, feat_path=feat_path)
 
         print_log(f'>>>>>>>>>>> Validation Epoch: {ii}', log_file)
         # auc_val = test_attention_DTFD_preFeat_MultipleMean(classifier=classifier, dimReduction=dimReduction, attention=attention,
@@ -245,7 +251,7 @@ def main():
 
         #     print_log(f' test auc: {test_auc}, from epoch {best_epoch}', log_file)
 
-        scheduler0.step()
+        # scheduler0.step()
         scheduler1.step()
 
 
@@ -257,7 +263,7 @@ def test_attention_DTFD_preFeat_MultipleMean(mDATA_list, classifier, dimReductio
     UClassifier.eval()
 
     SlideNames= list(mDATA_list.keys())
-    instance_per_group = total_instance // numGroup
+    # instance_per_group = total_instance // numGroup
 
     test_loss0 = AverageMeter()
     test_loss1 = AverageMeter()
@@ -323,25 +329,28 @@ def test_attention_DTFD_preFeat_MultipleMean(mDATA_list, classifier, dimReductio
                         tPredict = classifier(tattFeat_tensor)  ### 1 x 2
                         slide_sub_preds.append(tPredict)
 
-                        patch_pred_logits = get_cam_1d(classifier, tattFeats.unsqueeze(0)).squeeze(0)  ###  cls x n
-                        patch_pred_logits = torch.transpose(patch_pred_logits, 0, 1)  ## n x cls
-                        patch_pred_softmax = torch.softmax(patch_pred_logits, dim=1)  ## n x cls
+                        # patch_pred_logits = get_cam_1d(classifier, tattFeats.unsqueeze(0)).squeeze(0)  ###  cls x n
+                        # patch_pred_logits = torch.transpose(patch_pred_logits, 0, 1)  ## n x cls
+                        # patch_pred_softmax = torch.softmax(patch_pred_logits, dim=1)  ## n x cls
 
-                        _, sort_idx = torch.sort(patch_pred_softmax[:, -1], descending=True)
+                        # _, sort_idx = torch.sort(patch_pred_softmax[:, -1], descending=True)
 
-                        if distill == 'MaxMinS':
-                            topk_idx_max = sort_idx[:instance_per_group].long()
-                            topk_idx_min = sort_idx[-instance_per_group:].long()
-                            topk_idx = torch.cat([topk_idx_max, topk_idx_min], dim=0)
-                            d_inst_feat = tmidFeat.index_select(dim=0, index=topk_idx)
-                            slide_d_feat.append(d_inst_feat)
-                        elif distill == 'MaxS':
-                            topk_idx_max = sort_idx[:instance_per_group].long()
-                            topk_idx = topk_idx_max
-                            d_inst_feat = tmidFeat.index_select(dim=0, index=topk_idx)
-                            slide_d_feat.append(d_inst_feat)
-                        elif distill == 'AFS':
-                            slide_d_feat.append(tattFeat_tensor)
+                        # if distill == 'MaxMinS':
+                        #     topk_idx_max = sort_idx[:instance_per_group].long()
+                        #     topk_idx_min = sort_idx[-instance_per_group:].long()
+                        #     topk_idx = torch.cat([topk_idx_max, topk_idx_min], dim=0)
+                        #     d_inst_feat = tmidFeat.index_select(dim=0, index=topk_idx)
+                        #     slide_d_feat.append(d_inst_feat)
+                        # elif distill == 'MaxS':
+                        #     topk_idx_max = sort_idx[:instance_per_group].long()
+                        #     topk_idx = topk_idx_max
+                            # d_inst_feat = tmidFeat.index_select(dim=0, index=topk_idx)
+                            # slide_d_feat.append(d_inst_feat)
+                        # elif distill == 'AFS':
+                            # slide_d_feat.append(tattFeat_tensor)
+
+                    if distill == 'AFS':
+                        slide_d_feat.append(tattFeat_tensor)
 
                     slide_d_feat = torch.cat(slide_d_feat, dim=0)
                     slide_sub_preds = torch.cat(slide_sub_preds, dim=0)
@@ -397,7 +406,7 @@ def train_attention_preFeature_DTFD(mDATA_list, classifier, dimReduction, attent
     attention.train()
     UClassifier.train()
 
-    instance_per_group = total_instance // numGroup
+    # instance_per_group = total_instance // numGroup
 
     Train_Loss0 = AverageMeter()
     Train_Loss1 = AverageMeter()
@@ -450,48 +459,49 @@ def train_attention_preFeature_DTFD(mDATA_list, classifier, dimReduction, attent
             index_chunk_list = np.array_split(np.array(feat_index), numGroup)
             index_chunk_list = [sst.tolist() for sst in index_chunk_list]
 
-
             for tindex in index_chunk_list:
                 slide_sub_labels.append(tslideLabel)
                 subFeat_tensor = torch.index_select(tfeat_tensor, dim=0, index=torch.LongTensor(tindex).to(params.device))
+                # print(subFeat_tensor.shape)
                 tmidFeat = dimReduction(subFeat_tensor)
                 tAA = attention(tmidFeat).squeeze(0)
                 tattFeats = torch.einsum('ns,n->ns', tmidFeat, tAA)  ### n x fs
                 tattFeat_tensor = torch.sum(tattFeats, dim=0).unsqueeze(0)  ## 1 x fs
-                tPredict = classifier(tattFeat_tensor)  ### 1 x 2
-                slide_sub_preds.append(tPredict)
+                #tPredict = classifier(tattFeat_tensor)  ### 1 x 2
+                #slide_sub_preds.append(tPredict)
 
-                patch_pred_logits = get_cam_1d(classifier, tattFeats.unsqueeze(0)).squeeze(0)  ###  cls x n
-                patch_pred_logits = torch.transpose(patch_pred_logits, 0, 1)  ## n x cls
-                patch_pred_softmax = torch.softmax(patch_pred_logits, dim=1)  ## n x cls
+                # patch_pred_logits = get_cam_1d(classifier, tattFeats.unsqueeze(0)).squeeze(0)  ###  cls x n
+                # patch_pred_logits = torch.transpose(patch_pred_logits, 0, 1)  ## n x cls
+                # patch_pred_softmax = torch.softmax(patch_pred_logits, dim=1)  ## n x cls
 
-                _, sort_idx = torch.sort(patch_pred_softmax[:,-1], descending=True)
-                topk_idx_max = sort_idx[:instance_per_group].long()
-                topk_idx_min = sort_idx[-instance_per_group:].long()
-                topk_idx = torch.cat([topk_idx_max, topk_idx_min], dim=0)
+                # _, sort_idx = torch.sort(patch_pred_softmax[:,-1], descending=True)
+                # topk_idx_max = sort_idx[:instance_per_group].long()
+                # topk_idx_min = sort_idx[-instance_per_group:].long()
+                # topk_idx = torch.cat([topk_idx_max, topk_idx_min], dim=0)
 
-                MaxMin_inst_feat = tmidFeat.index_select(dim=0, index=topk_idx)   ##########################
-                max_inst_feat = tmidFeat.index_select(dim=0, index=topk_idx_max)
+                # MaxMin_inst_feat = tmidFeat.index_select(dim=0, index=topk_idx)   ##########################
+                # max_inst_feat = tmidFeat.index_select(dim=0, index=topk_idx_max)
                 af_inst_feat = tattFeat_tensor
 
-                if distill == 'MaxMinS':
-                    slide_pseudo_feat.append(MaxMin_inst_feat)
-                elif distill == 'MaxS':
-                    slide_pseudo_feat.append(max_inst_feat)
-                elif distill == 'AFS':
+                # if distill == 'MaxMinS':
+                #     slide_pseudo_feat.append(MaxMin_inst_feat)
+                # elif distill == 'MaxS':
+                #     slide_pseudo_feat.append(max_inst_feat)
+                # elif distill == 'AFS':
+                #     slide_pseudo_feat.append(af_inst_feat)
+                if distill == 'AFS':
                     slide_pseudo_feat.append(af_inst_feat)
 
             slide_pseudo_feat = torch.cat(slide_pseudo_feat, dim=0)  ### numGroup x fs
-
             ## optimization for the first tier
-            slide_sub_preds = torch.cat(slide_sub_preds, dim=0) ### numGroup x fs
-            slide_sub_labels = torch.cat(slide_sub_labels, dim=0) ### numGroup
-            loss0 = ce_cri(slide_sub_preds, slide_sub_labels).mean()
-            optimizer0.zero_grad()
-            loss0.backward(retain_graph=True)
-            torch.nn.utils.clip_grad_norm_(dimReduction.parameters(), params.grad_clipping)
-            torch.nn.utils.clip_grad_norm_(attention.parameters(), params.grad_clipping)
-            torch.nn.utils.clip_grad_norm_(classifier.parameters(), params.grad_clipping)
+            #slide_sub_preds = torch.cat(slide_sub_preds, dim=0) ### numGroup x fs
+            #slide_sub_labels = torch.cat(slide_sub_labels, dim=0) ### numGroup
+            # loss0 = ce_cri(slide_sub_preds, slide_sub_labels).mean()
+            # optimizer0.zero_grad()
+            # loss0.backward(retain_graph=True)
+            #torch.nn.utils.clip_grad_norm_(dimReduction.parameters(), params.grad_clipping)
+            #torch.nn.utils.clip_grad_norm_(attention.parameters(), params.grad_clipping)
+            #torch.nn.utils.clip_grad_norm_(classifier.parameters(), params.grad_clipping)
             # optimizer0.step()
 
             ## optimization for the second tier
@@ -500,10 +510,13 @@ def train_attention_preFeature_DTFD(mDATA_list, classifier, dimReduction, attent
             optimizer1.zero_grad()
             loss1.backward(retain_graph=True)
             torch.nn.utils.clip_grad_norm_(UClassifier.parameters(), params.grad_clipping)
-            optimizer0.step()
+            torch.nn.utils.clip_grad_norm_(dimReduction.parameters(), params.grad_clipping)
+            torch.nn.utils.clip_grad_norm_(attention.parameters(), params.grad_clipping)
+            torch.nn.utils.clip_grad_norm_(classifier.parameters(), params.grad_clipping)
+            # optimizer0.step()
             optimizer1.step()
 
-            Train_Loss0.update(loss0.item(), numGroup)
+            # Train_Loss0.update(loss0.item(), numGroup)
             Train_Loss1.update(loss1.item(), 1)
 
         if idx % params.train_show_freq == 0:
