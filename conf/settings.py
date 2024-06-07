@@ -20,5 +20,5 @@ TIME_NOW = datetime.now().strftime(DATE_FORMAT)
 DATA_ROOT = '/data/smb/syh/WSI_cls/'
 
 cam16_max_len = 44380
-cam16_num_seg = 256
+cam16_num_seg = 196
 cam16_wsi_len = math.ceil(cam16_max_len / cam16_num_seg) * cam16_num_seg

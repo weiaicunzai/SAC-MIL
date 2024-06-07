@@ -39,12 +39,12 @@ class MlpBlock(nn.Module):
 
 
 class MixerBlock(nn.Module):
-    def __init__(self, config):
+    def __init__(self, hidden_dim, num_tokens, token_dim, channel_dim):
         super(MixerBlock, self).__init__()
-        self.token_mlp_block = MlpBlock(config.n_patches, config.tokens_mlp_dim)
-        self.channel_mlp_block = MlpBlock(config.hidden_dim, config.channels_mlp_dim)
-        self.pre_norm = nn.LayerNorm(config.hidden_dim, eps=1e-6)
-        self.post_norm = nn.LayerNorm(config.hidden_dim, eps=1e-6)
+        self.token_mlp_block = MlpBlock(num_tokens, token_dim)
+        self.channel_mlp_block = MlpBlock(hidden_dim, channel_dim)
+        self.pre_norm = nn.LayerNorm(hidden_dim, eps=1e-6)
+        self.post_norm = nn.LayerNorm(hidden_dim, eps=1e-6)
 
     def forward(self, x):
         h = x
@@ -61,35 +61,44 @@ class MixerBlock(nn.Module):
         return x
 
 class ReducedMlpBlock(nn.Module):
-    def __init__(self, num_tokens, hidden_dim):
-        super(MlpBlock, self).__init__()
-        self.fc0 = nn.Linear(num_tokens, 1, bias=True)
-        self.fc1 = nn.Linear(hidden_dim, hidden_dim, bias=True)
+    def __init__(self, reduced_token_dim, token_dim):
+        super().__init__()
+        self.fc0 = nn.Linear(reduced_token_dim, 1, bias=True)
+        self.fc1 = nn.Linear(token_dim, token_dim, bias=True)
         self.act_fn = nn.GELU()
 
     def forward(self, x):
-        x = self.fc0(x)
+        x = self.fc0(x).squeeze(dim=-1)
         x = self.act_fn(x)
         x = self.fc1(x)
         return x
 
 class ReducedMixerBlock(nn.Module):
-    def __init__(self, num_tokens, hidden_dim, seg_tokens, channels_mlp_dim):
-        super(MixerBlock, self).__init__()
+    def __init__(self, wsi_len, num_tokens, hidden_dim, channel_dim):
+        super().__init__()
         #self.token_mlp_block = MlpBlock(config.n_patches, config.tokens_mlp_dim)
         #self.channel_mlp_block = MlpBlock(config.hidden_dim, config.channels_mlp_dim)
-        self.token_mlp_block = ReducedMlpBlock(num_tokens, hidden_dim)
-        self.channel_mlp_block = MlpBlock(seg_tokens, channels_mlp_dim)
-        self.pre_norm = nn.LayerNorm(config.hidden_dim, eps=1e-6)
-        self.pre_norm = nn.LayerNorm(config.hidden_dim, eps=1e-6)
-        self.post_norm = nn.LayerNorm(config.hidden_dim, eps=1e-6)
+        reduced_token_dim = wsi_len // num_tokens
+        self.token_mlp_block = ReducedMlpBlock(reduced_token_dim, num_tokens)
+        self.channel_mlp_block = MlpBlock(hidden_dim, channel_dim)
+        self.pre_norm = nn.LayerNorm(hidden_dim, eps=1e-6)
+        self.post_norm = nn.LayerNorm(hidden_dim, eps=1e-6)
+        self.reduced_token_dim = reduced_token_dim
 
     def forward(self, x):
+        B, L, D = x.shape
         h = x
+        h = h.view(B, L // self.reduced_token_dim, self.reduced_token_dim, D)
+        h = h.mean(dim=-2)
+        # print(x.shape)
         x = self.pre_norm(x)
         x = x.transpose(-1, -2)
+        # print(x.shape)
+        # print(self.reduced_token_dim)
+        x = x.view(B, D, L // self.reduced_token_dim, self.reduced_token_dim)
         x = self.token_mlp_block(x)
         x = x.transpose(-1, -2)
+        # print(x.shape, h.shape)
         x = x + h
 
         h = x
@@ -100,12 +109,12 @@ class ReducedMixerBlock(nn.Module):
 
 
 class MlpMixer(nn.Module):
-    def __init__(self, input_dim, hidden_dim, seq_len, reduced_token_dim, channel_dim, token_dim, num_classes=2, ):
+    def __init__(self, input_dim, hidden_dim, seq_len, num_tokens, channel_dim, token_dim, num_classes=2, ):
         super(MlpMixer, self).__init__()
         # self.zero_head = zero_head
         self.num_classes = num_classes
         self.seq_len = seq_len
-        self.reduced_token_dim = reduced_token_dim
+        self.token_dim = token_dim
 
         self.fc1 = nn.Linear(input_dim, hidden_dim)
         # self.stem = nn.Conv2d(in_channels=3,
@@ -120,8 +129,18 @@ class MlpMixer(nn.Module):
         # for _ in range(config.num_blocks):
         # for _ in range(2):
         # seq_len =
-        self.layer1 = ReducedMixerBlock(reduced_token_dim, hidden_dim, seg_tokens=seq_len // reduced_token_dim, hidden_dim=hidden_dim)
-        self.layer2 = MixerBlock(token_dim, channel_dim)
+        self.layer1 = ReducedMixerBlock(
+            wsi_len=seq_len,
+            num_tokens=num_tokens,
+            channel_dim=channel_dim,
+            hidden_dim=hidden_dim
+        )
+        self.layer2 = MixerBlock(
+            hidden_dim=hidden_dim,
+            num_tokens=num_tokens,
+            token_dim=token_dim,
+            channel_dim=channel_dim
+        )
 
         # self.layer.append(copy.deepcopy(layer))
 
@@ -134,6 +153,7 @@ class MlpMixer(nn.Module):
         # for block in self.layer:
             # x = block(x)
         x = self.fc1(x)
+
 
         x = self.layer1(x)
         x = self.layer2(x)

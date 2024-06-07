@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 class WSIDataset(Dataset):
     def __init__(self, data_root, data_set, fold, wsi_len):
+        super().__init__()
         # Set all input args as attributes
         self.data_root = data_root
         self.feat_dir = os.path.join(
@@ -141,7 +142,8 @@ def get_loader(args):
     testset = WSIDataset(
         os.path.join(args.data_root, args.dataset_name),
         data_set='test',
-        fold=args.fold
+        fold=args.fold,
+        wsi_len=wsi_len
     )
     if args.local_rank == 0:
         torch.distributed.barrier()

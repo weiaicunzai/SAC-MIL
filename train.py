@@ -63,18 +63,22 @@ def setup(args):
     # Prepare model
     config = CONFIGS[args.model_type]
 
-    num_classes = 10
+    num_classes = 2
 
     if args.dataset_name == 'cam16':
         wsi_len = settings.cam16_wsi_len
+        print(wsi_len)
 
     model = MlpMixer(
         input_dim=1024,
         hidden_dim=512,
         seq_len=wsi_len,
-        reduced_token_dim=256,
-        channel_dim=
+        token_dim=256,
+        channel_dim=512,
+        num_tokens=196,
+        num_classes=num_classes
     )
+    print(model)
     # if args.pretrained_dir:
     #     print(f"Loading pretrained model from {args.pretrained_dir}")
     #     try:
@@ -202,7 +206,6 @@ def train(args, model):
                                 momentum=0.9,
                                 weight_decay=args.weight_decay)
 
-    print('total number of parameters', sum([p.numel() for p in model.parameters()]))
     t_total = args.num_steps
     if args.decay_type == "cosine":
         scheduler = WarmupCosineSchedule(optimizer, warmup_steps=args.warmup_steps, t_total=t_total)
