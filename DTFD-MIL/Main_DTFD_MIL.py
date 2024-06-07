@@ -14,6 +14,7 @@ from Model.network import    Classifier_1fc, DimReduction
 import numpy as np
 from utils import eval_metric
 import pandas as pd
+import random
 
 parser = argparse.ArgumentParser(description='abc')
 testMask_dir = '' ## Point to the Camelyon test set mask location
@@ -101,10 +102,38 @@ def read_slides(csv_file, split_file, fold, data_set):
     return wsis
 
 
+import torchmetrics
+metrics = torchmetrics.MetricCollection([
+                torchmetrics.Accuracy(num_classes=2, average = 'macro', task='MULTICLASS'),
+                torchmetrics.AUROC(num_classes=2, average = 'macro', task='MULTICLASS'),
+                # torchmetrics.CohenKappa(num_classes=self.num_classes, task='MULTICLASS'),
+                torchmetrics.F1Score(num_classes=2, average = 'macro', task='MULTICLASS'),
+                # torchmetrics.Recall(average='macro', num_classes=self.num_classes, task='MULTICLASS'),
+                # torchmetrics.Precision(average='macro',num_classes=self.num_classes, task='MULTICLASS')
+            ]
+        )
 
+def pad_seq(self, features):
+        fact = self.wsi_len / features.shape[1] + 1
+
+        features = features.repeat(1, int(fact), 1)
+
+        features = features[:, :self.wsi_len, :]
+
+        assert features.shape[1] == self.wsi_len
+
+        return features
 
 def load_feat(slide_id, feat_path):
-    return torch.load(os.path.join(feat_path, slide_id + '.pt'))
+    feat = torch.load(os.path.join(feat_path, slide_id + '.pt'))
+
+    # index = [x for x in range(feat.shape[0])]
+    # random.shuffle(index)
+    # feat = feat[index]
+
+
+
+    return feat
 def main():
     params = parser.parse_args()
     epoch_step = json.loads(params.epoch_step)
@@ -192,30 +221,30 @@ def main():
         tauc = test_attention_DTFD_preFeat_MultipleMean(classifier=classifier, dimReduction=dimReduction, attention=attention,
                                                         UClassifier=attCls, mDATA_list=(SlideNames_test), criterion=ce_cri, epoch=ii,  params=params, f_log=log_file, writer=writer, numGroup=params.numGroup_test, total_instance=params.total_instance_test, distill=params.distill_type, feat_path=feat_path)
 
-        print_log(' ', log_file)
-        print_log(f'>>>>>>>>>>> Test Epoch: {ii}', log_file)
+        # print_log(' ', log_file)
+        # print_log(f'>>>>>>>>>>> Test Epoch: {ii}', log_file)
         # tauc = test_attention_DTFD_preFeat_MultipleMean(classifier=classifier, dimReduction=dimReduction, attention=attention,
                                                         # UClassifier=attCls, mDATA_list=(SlideNames_test, FeatList_test, Label_test), criterion=ce_cri, epoch=ii,  params=params, f_log=log_file, writer=writer, numGroup=params.numGroup_test, total_instance=params.total_instance_test, distill=params.distill_type)
-        tauc = test_attention_DTFD_preFeat_MultipleMean(classifier=classifier, dimReduction=dimReduction, attention=attention,
-                                                        UClassifier=attCls, mDATA_list=(SlideNames_test), criterion=ce_cri, epoch=ii,  params=params, f_log=log_file, writer=writer, numGroup=params.numGroup_test, total_instance=params.total_instance_test, distill=params.distill_type, feat_path=feat_path)
+        # tauc = test_attention_DTFD_preFeat_MultipleMean(classifier=classifier, dimReduction=dimReduction, attention=attention,
+                                                        # UClassifier=attCls, mDATA_list=(SlideNames_test), criterion=ce_cri, epoch=ii,  params=params, f_log=log_file, writer=writer, numGroup=params.numGroup_test, total_instance=params.total_instance_test, distill=params.distill_type, feat_path=feat_path)
 
-        print_log(' ', log_file)
+        # print_log(' ', log_file)
 
-        if ii > int(params.EPOCH*0.8):
-            if auc_val > best_auc:
-                best_auc = auc_val
-                best_epoch = ii
-                test_auc = tauc
-                if params.isSaveModel:
-                    tsave_dict = {
-                        'classifier': classifier.state_dict(),
-                        'dim_reduction': dimReduction.state_dict(),
-                        'attention': attention.state_dict(),
-                        'att_classifier': attCls.state_dict()
-                    }
-                    torch.save(tsave_dict, save_dir)
+        # if ii > int(params.EPOCH*0.8):
+        #     if auc_val > best_auc:
+        #         best_auc = auc_val
+        #         best_epoch = ii
+        #         test_auc = tauc
+        #         if params.isSaveModel:
+        #             tsave_dict = {
+        #                 'classifier': classifier.state_dict(),
+        #                 'dim_reduction': dimReduction.state_dict(),
+        #                 'attention': attention.state_dict(),
+        #                 'att_classifier': attCls.state_dict()
+        #             }
+        #             torch.save(tsave_dict, save_dir)
 
-            print_log(f' test auc: {test_auc}, from epoch {best_epoch}', log_file)
+        #     print_log(f' test auc: {test_auc}, from epoch {best_epoch}', log_file)
 
         scheduler0.step()
         scheduler1.step()
@@ -336,19 +365,25 @@ def test_attention_DTFD_preFeat_MultipleMean(mDATA_list, classifier, dimReductio
                 test_loss1.update(loss1.item(), 1)
 
     gPred_0 = torch.softmax(gPred_0, dim=1)
-    gPred_0 = gPred_0[:, -1]
-    gPred_1 = gPred_1[:, -1]
+    # gPred_0 = gPred_0[:, -1]
+    # gPred_1 = gPred_1[:, -1]
 
-    macc_0, mprec_0, mrecal_0, mspec_0, mF1_0, auc_0 = eval_metric(gPred_0, gt_0)
-    macc_1, mprec_1, mrecal_1, mspec_1, mF1_1, auc_1 = eval_metric(gPred_1, gt_1)
+    print('fisrt-iter',  metrics.to(params.device)(gPred_0, gt_0))
+    print('second-iter', metrics.to(params.device)(gPred_1, gt_1))
+    metrics.reset()
+    # macc_0, mprec_0, mrecal_0, mspec_0, mF1_0, auc_0 = eval_metric(gPred_0, gt_0)
+    # macc_1, mprec_1, mrecal_1, mspec_1, mF1_1, auc_1 = eval_metric(gPred_1, gt_1)
 
-    print_log(f'  First-Tier acc {macc_0}, precision {mprec_0}, recall {mrecal_0}, specificity {mspec_0}, F1 {mF1_0}, AUC {auc_0}', f_log)
-    print_log(f'  Second-Tier acc {macc_1}, precision {mprec_1}, recall {mrecal_1}, specificity {mspec_1}, F1 {mF1_1}, AUC {auc_1}', f_log)
+    # print_log(f'  First-Tier acc {macc_0}, precision {mprec_0}, recall {mrecal_0}, specificity {mspec_0}, F1 {mF1_0}, AUC {auc_0}', f_log)
+    # print_log(f'  Second-Tier acc {macc_1}, precision {mprec_1}, recall {mrecal_1}, specificity {mspec_1}, F1 {mF1_1}, AUC {auc_1}', f_log)
 
-    writer.add_scalar(f'auc_0 ', auc_0, epoch)
-    writer.add_scalar(f'auc_1 ', auc_1, epoch)
+    # writer.add_scalar(f'auc_0 ', auc_0, epoch)
+    # writer.add_scalar(f'auc_1 ', auc_1, epoch)
 
-    return auc_1
+    # return auc_1
+
+    return
+
 
 
 def train_attention_preFeature_DTFD(mDATA_list, classifier, dimReduction, attention, UClassifier,  optimizer0, optimizer1, epoch, ce_cri=None, params=None,
