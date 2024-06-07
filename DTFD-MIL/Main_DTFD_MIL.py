@@ -127,13 +127,12 @@ def pad_seq(self, features):
 def load_feat(slide_id, feat_path):
     feat = torch.load(os.path.join(feat_path, slide_id + '.pt'))
 
-    # index = [x for x in range(feat.shape[0])]
-    # random.shuffle(index)
-    # feat = feat[index]
-
-
+    index = [x for x in range(feat.shape[0])]
+    random.shuffle(index)
+    feat = feat[index]
 
     return feat
+
 def main():
     params = parser.parse_args()
     epoch_step = json.loads(params.epoch_step)
