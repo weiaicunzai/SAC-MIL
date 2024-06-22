@@ -320,7 +320,6 @@ def train(args, model):
                 if global_step % t_total == 0:
                     break
 
-
         accuracy = valid(args, model, writer, test_loader, global_step)
         if best_acc < accuracy:
             save_model(args, model)
@@ -399,6 +398,13 @@ def main():
                              "0 (default value): dynamic loss scaling.\n"
                              "Positive power of 2: static loss scaling value.\n")
     args = parser.parse_args()
+
+
+    from datetime import datetime
+    DATE_FORMAT = '%A_%d_%B_%Y_%Hh_%Mm_%Ss'
+    TIME_NOW = datetime.now().strftime(DATE_FORMAT)
+
+    args.output_dir = os.path.join(args.output_dir, TIME_NOW)
 
     # Setup CUDA, GPU & distributed training
     if args.local_rank == -1:
