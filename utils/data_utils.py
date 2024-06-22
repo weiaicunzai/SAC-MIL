@@ -98,12 +98,12 @@ class WSIDataset(Dataset):
 
         #----> shuffle
         # if self.shuffle == True:
-        index = [x for x in range(features.shape[0])]
-        random.shuffle(index)
-        features = features[index]
 
         features = self.pad_seq(features)
 
+        index = [x for x in range(features.shape[0])]
+        random.shuffle(index)
+        features = features[index]
 
 
         return features, label
