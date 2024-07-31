@@ -19,6 +19,7 @@ from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
 from models.modeling import MlpMixer, CONFIGS
+from models.transmil import TransMIL
 from utils.scheduler import WarmupLinearSchedule, WarmupCosineSchedule
 from utils.data_utils import get_loader
 from utils.dist_utils import get_world_size
@@ -33,10 +34,7 @@ import torchmetrics
 metrics = torchmetrics.MetricCollection([
                 torchmetrics.Accuracy(num_classes=2, average = 'macro', task='MULTICLASS'),
                 torchmetrics.AUROC(num_classes=2, average = 'macro', task='MULTICLASS'),
-                # torchmetrics.CohenKappa(num_classes=self.num_classes, task='MULTICLASS'),
                 torchmetrics.F1Score(num_classes=2, average = 'macro', task='MULTICLASS'),
-                # torchmetrics.Recall(average='macro', num_classes=self.num_classes, task='MULTICLASS'),
-                # torchmetrics.Precision(average='macro',num_classes=self.num_classes, task='MULTICLASS')
             ]
         )
 
@@ -68,7 +66,6 @@ def save_model(args, model):
     torch.save(model_to_save.state_dict(), model_checkpoint)
     logger.info("Saved model checkpoint to [DIR: %s]", args.output_dir)
 
-
 def setup(args):
     # Prepare model
     config = CONFIGS[args.model_type]
@@ -79,16 +76,18 @@ def setup(args):
         wsi_len = settings.cam16_wsi_len
         print(wsi_len)
 
-    model = MlpMixer(
-        input_dim=1024,
-        hidden_dim=512,
-        seq_len=wsi_len,
-        token_dim=256,
-        channel_dim=512,
-        num_tokens=196,
-        num_classes=num_classes
-    )
-    print(model)
+    # model = MlpMixer(
+    #     input_dim=1024,
+    #     hidden_dim=512,
+    #     seq_len=wsi_len,
+    #     token_dim=256,
+    #     channel_dim=512,
+    #     num_tokens=196,
+    #     num_classes=num_classes
+    # )
+
+    # print(model)
+    model = TransMIL(2)
     # if args.pretrained_dir:
     #     print(f"Loading pretrained model from {args.pretrained_dir}")
     #     try:
@@ -133,11 +132,9 @@ def setup(args):
     logger.info("Total Parameter: \t%2.1fM" % num_params)
     return args, model
 
-
 def count_parameters(model):
     params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     return params/1000000
-
 
 def set_seed(args):
     random.seed(args.seed)
@@ -145,7 +142,6 @@ def set_seed(args):
     torch.manual_seed(args.seed)
     if args.n_gpu > 0:
         torch.cuda.manual_seed_all(args.seed)
-
 
 def valid(args, model, writer, test_loader, global_step):
     # Validation!
@@ -214,7 +210,8 @@ def valid(args, model, writer, test_loader, global_step):
 
     print('Validation: ', val_res)
 
-    return val_res['MulticlassAccuracy']
+    # return val_res['MulticlassAccuracy']
+    return val_res
 
 
 def train(args, model):
@@ -228,36 +225,13 @@ def train(args, model):
     # Prepare dataset
     train_loader, test_loader = get_loader(args)
 
-    # Prepare optimizer and scheduler
-    # optimizer = torch.optim.SGD(model.parameters(),
-    #                             lr=args.learning_rate,
-    #                             momentum=0.9,
-    #                             weight_decay=args.weight_decay)
-    # print(args.learning_rate, args.weight_decay)
-    # import sys; sys.exit()
     optimizer = torch.optim.Adam(
         model.parameters(),
         lr=args.learning_rate,
         weight_decay=args.weight_decay,
     )
 
-    t_total = args.num_steps
-    # if args.decay_type == "cosine":
-    #     scheduler = WarmupCosineSchedule(optimizer, warmup_steps=args.warmup_steps, t_total=t_total)
-    # else:
-    #     scheduler = WarmupLinearSchedule(optimizer, warmup_steps=args.warmup_steps, t_total=t_total)
-
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [100], gamma=0.2)
-
-    # if args.fp16:
-    #     model, optimizer = amp.initialize(models=model,
-    #                                       optimizers=optimizer,
-    #                                       opt_level=args.fp16_opt_level)
-    #     amp._amp_state.loss_scalers[0]._loss_scale = 2**20
-
-    # Distributed training
-    # if args.local_rank != -1:
-    #     model = DDP(model, message_size=250000000, gradient_predivide_factor=get_world_size())
 
     # Train!
     logger.info("***** Running training *****")
@@ -271,9 +245,10 @@ def train(args, model):
     model.zero_grad()
     set_seed(args)  # Added here for reproducibility (even between python 2 and 3)
     losses = AverageMeter()
-    global_step, best_acc = 0, 0
+    # global_step, best_acc = 0, 0
+    best_acc = None
     # while True:
-    for e_idx in range(200):
+    for e_idx in range(args.num_steps):
         model.train()
         epoch_iterator = tqdm(train_loader,
                               desc="Training (X / X Steps) (loss=X.X)",
@@ -281,10 +256,12 @@ def train(args, model):
                               dynamic_ncols=True,
                               disable=args.local_rank not in [-1, 0])
         for step, batch in enumerate(epoch_iterator):
+            # print(step, '................', len(train_loader.dataset))
             batch = tuple(t.to(args.device) for t in batch)
             x, y = batch
             # print(x.shape, y.shape)
             loss = model(x, y)
+            # print('hello???')
 
             if args.gradient_accumulation_steps > 1:
                 loss = loss / args.gradient_accumulation_steps
@@ -304,9 +281,9 @@ def train(args, model):
                 optimizer.zero_grad()
 
 
-                if args.local_rank in [-1, 0]:
-                    writer.add_scalar("train/loss", scalar_value=losses.val, global_step=global_step)
-                    writer.add_scalar("train/lr", scalar_value=scheduler.get_lr()[0], global_step=global_step)
+                # if args.local_rank in [-1, 0]:
+                #     writer.add_scalar("train/loss", scalar_value=losses.val, global_step=e_idx)
+                #     writer.add_scalar("train/lr", scalar_value=scheduler.get_lr()[0], global_step=e_idx)
                 # if global_step % args.eval_every == 0 and args.local_rank in [-1, 0]:
                 #     accuracy = valid(args, model, writer, test_loader, global_step)
                 #     if best_acc < accuracy:
@@ -317,28 +294,35 @@ def train(args, model):
                     "Training (%d / %d Step) (loss=%2.5f)" % (step, len(train_loader.dataset), losses.val)
                 )
 
-                if global_step % t_total == 0:
-                    break
+        val_res = valid(args, model, writer, test_loader, e_idx)
+        accuracy =  val_res['MulticlassAccuracy']
+        if best_acc is None:
+            best_acc = val_res
 
-        accuracy = valid(args, model, writer, test_loader, global_step)
-        if best_acc < accuracy:
+        if best_acc['MulticlassAccuracy'] < accuracy:
             save_model(args, model)
-            best_acc = accuracy
+            best_acc = val_res
+
+        print('best performance: ', best_acc)
+
+        if args.local_rank in [-1, 0]:
+            writer.add_scalar("train/loss", scalar_value=losses.val, global_step=e_idx)
+            writer.add_scalar("train/lr", scalar_value=scheduler.get_lr()[0], global_step=e_idx)
+
         model.train()
 
         losses.reset()
 
-        global_step += 1
+        # global_step += 1
         scheduler.step()
 
-        if global_step % t_total == 0:
-            break
+        # if global_step % t_total == 0:
+            # break
 
     if args.local_rank in [-1, 0]:
         writer.close()
     logger.info("Best Accuracy: \t%f" % best_acc)
     logger.info("End Training!")
-
 
 def main():
     parser = argparse.ArgumentParser()
@@ -399,7 +383,6 @@ def main():
                              "Positive power of 2: static loss scaling value.\n")
     args = parser.parse_args()
 
-
     from datetime import datetime
     DATE_FORMAT = '%A_%d_%B_%Y_%Hh_%Mm_%Ss'
     TIME_NOW = datetime.now().strftime(DATE_FORMAT)
@@ -436,9 +419,9 @@ def main():
     # Model & Tokenizer Setup
     args, model = setup(args)
 
+    # print('?????'); import sys; sys.exit()
     # Training
     train(args, model)
-
 
 if __name__ == "__main__":
     main()

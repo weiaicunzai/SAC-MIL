@@ -25,12 +25,17 @@ class WSIDataset(Dataset):
         super().__init__()
         # Set all input args as attributes
         self.data_root = data_root
+
         self.feat_dir = os.path.join(
             self.data_root,
                 'feat_clam_resnet50',
                 'patch_size_256_at_mag_20',
                 'pt_files'
             )
+        self.idx = os.path.join(
+            self.data_root,
+            "idx_64"
+        )
 
         dataset_name = os.path.basename(self.data_root)
         self.file_list_csv = os.path.join('dataset_csv', 'dataset_list', dataset_name, '{}.csv'.format(dataset_name))
@@ -42,6 +47,8 @@ class WSIDataset(Dataset):
         # if dataset_name == 'cam16':
         #     self.wsi_len = 44380
         self.wsi_len = wsi_len
+
+        self.data_set = data_set
 
 
 
@@ -91,20 +98,23 @@ class WSIDataset(Dataset):
 
     def __getitem__(self, idx):
         slide_id = self.slide_names[idx]
-        # label = int(self.label[idx])
+        # print(slide_id)
         label = self.wsis[slide_id]
         full_path = os.path.join(self.feat_dir, '{}.pt'.format(slide_id))
         features = torch.load(full_path)
 
+        # idx = torch.load(os.path.join(self.idx, slide_id + '.pt')).long()
+        # features = features[idx]
+
         #----> shuffle
         # if self.shuffle == True:
 
-        features = self.pad_seq(features)
+        # features = self.pad_seq(features)
 
-        index = [x for x in range(features.shape[0])]
-        random.shuffle(index)
-        features = features[index]
-
+        if self.data_set == 'train':
+            index = [x for x in range(features.shape[0])]
+            random.shuffle(index)
+            features = features[index]
 
         return features, label
 
@@ -112,25 +122,6 @@ def get_loader(args):
     if args.local_rank not in [-1, 0]:
         torch.distributed.barrier()
 
-    # transform_train = transforms.Compose([
-    #     transforms.RandomResizedCrop((args.img_size, args.img_size), scale=(0.05, 1.0)),
-    #     transforms.ToTensor(),
-    #     transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
-    # ])
-    # transform_test = transforms.Compose([
-    #     transforms.Resize((args.img_size, args.img_size)),
-    #     transforms.ToTensor(),
-    #     transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
-    # ])
-
-    # trainset = datasets.CIFAR10(root="./data",
-    #                             train=True,
-    #                             download=True,
-    #                             transform=transform_train)
-    # testset = datasets.CIFAR10(root="./data",
-    #                             train=False,
-    #                             download=True,
-    #                             transform=transform_test) if args.local_rank in [-1, 0] else None
     if args.dataset_name == 'cam16':
         wsi_len = settings.cam16_wsi_len
     trainset = WSIDataset(
@@ -143,7 +134,7 @@ def get_loader(args):
         os.path.join(args.data_root, args.dataset_name),
         data_set='test',
         fold=args.fold,
-        wsi_len=wsi_len
+        # wsi_len=wsi_len
     )
     if args.local_rank == 0:
         torch.distributed.barrier()

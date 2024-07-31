@@ -212,8 +212,177 @@ class Attention_Gated(nn.Module):
 #         pred = self.classifier(afeat) ## K x num_cls
 #         return pred
 
+class IntraRegion(nn.Module):
+
+    # def __init__(self, )
+    def __init__(self, hidden_dim, k):
+        self.hidden_dim = hidden_dim
+        self.k = k
+
+    def unroll(self, x):
+        D = x.shape[-1]
+        x = x.split(
+            D // self.k,
+            dim=-1
+        )
+
+        res = []
+        for idx, chunk in enumerate(x):
+            chunk = torch.roll(chunk, -idx, dims=-2)
+            res.append(chunk)
+
+        res = torch.cat(res, dim=-1)
+
+        return res
+
+    def roll(self, x):
+        D = x.shape[-1]
+        x = x.split(
+            D // self.k,
+            dim=-1
+        )
+
+        res = []
+        for idx, chunk in enumerate(x):
+            # print(chunk.shape, idx)
+            # print(chunk[0, 0, :, 0])
+            chunk = torch.roll(chunk, idx, dims=-2)
+            # print(chunk[0, 0, :, 0])
+            # print(idx)
+            res.append(chunk)
+
+        res = torch.cat(res, dim=-1)
+        # print(res[0, 0, 3, 8*3: 8 * 4], tmp)
+
+        return res
+
+    def forward(self, x):
+
+        index = 1
+        B, L, D = x.shape
+        x = x.view(B, L // self.k, self.k, D)
+        padding = 0
+
+        while(x.shape[1] >= self.k):
+
+            x = self.cal_region(x)
+
+            # restore one dimension
+            x = x.view(B, -1, D)
+            x = x[:, :L, :]
+
+            # pad more
+            index += 1
+            padding = self.k ** index - L % self.k ** index
+            if padding != 0:
+                x = torch.cat([x, x[:, :padding, :]], dim=1)
+
+            x = x.view(B, -1, self.k ** index, D)
+
+        total_len = L
+        centroids = x[:, :, :1, :]
+        rest = x[:, :, 1:, :]
+        # print(centroids.shape)
+        B, L, R, D = centroids.shape
+        centroids = centroids.view(B, L, D)
+        centroids = self.roll(centroids)
+        centroids = self.inter_fc(centroids)
+        centroids = self.unroll(centroids)
+        centroids = self.intra_fc(centroids)
+        centroids = centroids.view(B, L, R, D)
+        x = torch.cat([centroids, rest], dim=2)
+
+
+
+        # restore one dimension
+        x = x.view(B, -1, D)
+        x = x[:, :total_len, :]
+
+        # print(x.shape)
+
+        return x
+
+
+
+class InterRegion(nn.Module):
+    def __init__(self, hidden_dim, k):
+        super().__init__()
+
+        self.k = k
+        self.inter_fc = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU()
+        )
+        self.intra_fc = nn.Sequential(
+            nn.Linear(
+                hidden_dim,
+                hidden_dim
+            ),
+            nn.ReLU()
+        )
+
+        self.pre_norm = nn.LayerNorm(hidden_dim)
+        self.norm = nn.LayerNorm(hidden_dim)
+
+    def forward(self, x):
+
+        x = self.pre_norm(x)
+        B, L, D = x.shape
+        res = x
+
+
+        x = x.view(B, L // self.k, self.k, D)
+        x = self.roll(x)
+        x = self.inter_fc(x)
+        x = self.unroll(x)
+        x = self.intra_fc(x)
+
+        x = x.view(B, L, D)
+
+        x = x + res
+        x = self.norm(x)
+
+        return x
+
+    def unroll(self, x):
+        D = x.shape[-1]
+        x = x.split(
+            D // self.k,
+            dim=-1
+        )
+
+        res = []
+        for idx, chunk in enumerate(x):
+            chunk = torch.roll(chunk, -idx, dims=-2)
+            res.append(chunk)
+
+        res = torch.cat(res, dim=-1)
+
+        return res
+
+    def roll(self, x):
+        D = x.shape[-1]
+        x = x.split(
+            D // self.k,
+            dim=-1
+        )
+
+        res = []
+        for idx, chunk in enumerate(x):
+            # print(chunk.shape, idx)
+            # print(chunk[0, 0, :, 0])
+            chunk = torch.roll(chunk, idx, dims=-2)
+            # print(chunk[0, 0, :, 0])
+            # print(idx)
+            res.append(chunk)
+
+        res = torch.cat(res, dim=-1)
+        # print(res[0, 0, 3, 8*3: 8 * 4], tmp)
+
+        return res
+
 class MlpMixer(nn.Module):
-    def __init__(self, input_dim, hidden_dim, seq_len, num_tokens, channel_dim, token_dim, num_classes=2, ):
+    def __init__(self, input_dim, hidden_dim, seq_len, num_tokens, channel_dim, token_dim, num_classes=2):
         super().__init__()
         # self.zero_head = zero_head
         self.num_classes = num_classes
@@ -222,14 +391,34 @@ class MlpMixer(nn.Module):
 
         # net_dim = 512
         self.fc1 = DimReduction(input_dim, m_dim=hidden_dim)
+        # self.fc1 = nn.Linear(input_dim, hidden_dim)
 
         self.attention =  Attention_Gated(hidden_dim)
 
         self.num_tokens = num_tokens
         self.channel_dim = channel_dim
+        self.k = 64
 
+        self.intra_region = InterRegion(hidden_dim, self.k)
 
-        self.attention2 = Attention_Gated(hidden_dim)
+        # self.attention2 = Attention_Gated(hidden_dim)
+        # self.channel_mix = nn.Sequential(
+
+        # self.layer2 = MlpBlock(
+        #     hidden_dim=hidden_dim,
+        #     ff_dim= int(hidden_dim * 1)
+        # )
+
+        # )
+        # self.inter_fc = nn.Sequential(
+        #     nn.Linear(hidden_dim, hidden_dim),
+        #     nn.ReLU(inplace=True),
+        # )
+        # self.intra_fc = nn.Sequential(
+        #     nn.Linear(hidden_dim, hidden_dim),
+        #     nn.ReLU(inplace=True),
+        # )
+
 
         self.fc2 = nn.Linear(hidden_dim, self.num_classes)
 
@@ -239,7 +428,6 @@ class MlpMixer(nn.Module):
         #                       stride=patch_size)
         # self.head = nn.Linear(hidden_dim, num_classes, bias=True)
         # self.pre_head_ln = nn.LayerNorm(hidden_dim, eps=1e-6)
-
 
         # self.layer = nn.ModuleList()
         # for _ in range(config.num_blocks):
@@ -259,6 +447,137 @@ class MlpMixer(nn.Module):
         # )
 
         # self.layer.append(copy.deepcopy(layer))
+        self.last_norm = nn.LayerNorm(hidden_dim)
+        self.pre_norm = nn.LayerNorm(hidden_dim)
+
+    def pad_k(self, x):
+        # x = self.()
+        length = x.shape[1]
+        # print(length)
+        pad_k = self.k - length % self.k
+        # print(k)
+        if pad_k > 0:
+            x = torch.cat([x, x[:, :pad_k, :]], dim=1)
+
+        return x
+
+    # def intra_region(self, x):
+    #     # # x = self.
+    #     # x = self.inter_fc
+    #     # x = self.unroll(x)
+    #     # print(x.shape)
+    #     B, L, D = x.shape
+    #     x = x.view(B, L // self.k, self.k, D)
+    #     x = self.roll(x)
+    #     x = self.inter_fc(x)
+    #     x = self.unroll(x)
+    #     x = self.intra_fc(x)
+
+    #     x = x.view(B, L, D)
+
+    #     return x
+
+
+    def cal_region(self, x):
+        centroids = x[:, :, :1, :]
+        rest = x[:, :, 1:, :]
+
+        num_set = int(centroids.shape[1] / self.k) * self.k
+
+        left = centroids[:, :num_set, :, :]
+
+        # print(left.shape) [1, 128, 1, 512]
+        B, L, T, D = left.shape
+        left = left.view(B, -1, self.k, D)
+        left = self.roll(left)
+        left = self.inter_fc(left)
+        left = self.unroll(left)
+        left = self.intra_fc(left)
+        left = left.view(B, L, T, D)
+
+
+        # print(left.shape, centroids.shape, num_set, self.k)
+        if centroids.shape[1] != num_set * self.k:
+            right = centroids[:, num_set:, :]
+            assert right.shape[1] < self.k
+
+            right = self.roll(right)
+            right = self.inter_fc(right)
+            right = self.unroll(right)
+            right = self.intra_fc(right)
+
+            centroids = torch.cat([left, right], dim=1)
+
+        else:
+            centroids = left
+
+        # print(type(centroids), type(rest))
+        x = torch.cat([centroids, rest], dim=2)
+
+        return x
+
+    #def inter_region(self, x):
+    #    # tmp = x.shape
+    #    # B, L, D = x.shape
+    #    # tmp = x
+
+
+    #    # right = x[:, ::self.k:, :]
+
+    #    # left =
+    #    # print(centroids.shape)
+
+    #    # centroids[centr]
+    #    index = 1
+    #    # centroids = x[:, ::self.k ** index, :]
+    #    B, L, D = x.shape
+    #    x = x.view(B, L // self.k, self.k, D)
+    #    padding = 0
+    #    # real_le
+
+    #    while(x.shape[1] >= self.k):
+
+    #        x = self.cal_region(x)
+
+    #        # restore one dimension
+    #        x = x.view(B, -1, D)
+    #        x = x[:, :L, :]
+
+    #        # pad more
+    #        index += 1
+    #        padding = self.k ** index - L % self.k ** index
+    #        if padding != 0:
+    #            x = torch.cat([x, x[:, :padding, :]], dim=1)
+
+    #        x = x.view(B, -1, self.k ** index, D)
+
+
+    #    total_len = L
+    #    centroids = x[:, :, :1, :]
+    #    rest = x[:, :, 1:, :]
+    #    # print(centroids.shape)
+    #    B, L, R, D = centroids.shape
+    #    centroids = centroids.view(B, L, D)
+    #    centroids = self.roll(centroids)
+    #    centroids = self.inter_fc(centroids)
+    #    centroids = self.unroll(centroids)
+    #    centroids = self.intra_fc(centroids)
+    #    centroids = centroids.view(B, L, R, D)
+    #    x = torch.cat([centroids, rest], dim=2)
+
+
+
+    #    # restore one dimension
+    #    x = x.view(B, -1, D)
+    #    x = x[:, :total_len, :]
+
+    #    # print(x.shape)
+
+    #    return x
+
+
+
+
 
      # 44380
     def forward(self, x, labels=None):
@@ -268,39 +587,45 @@ class MlpMixer(nn.Module):
 
         # for block in self.layer:
             # x = block(x)
+        # print(x.shape)
+        # x = self.pad_k(x)
+        # print(x.shape, 'cccc')
+
         x = self.fc1(x)
 
-        B, L, D = x.shape
-        x = x.view(B, self.num_tokens, L // self.num_tokens, D)
+        # x = self.pre_norm(x)
+        # x = x.view(B, self.num_tokens, L // self.num_tokens, D)
         # x = self.layer1(x)
         # x = self.layer2(x)
         # x = self.pre_head_ln(x)
         # x = torch.mean(x, dim=1)
         # logits = self.head(x)
         # print(x.shape)
+
+        # x = self.intra_region(x)
         tAA = self.attention(x)
-        # print(x.shape, tAA.shape)
+        # tattFeats = torch.einsum('bls,bld->bs', x, tAA)  ### n x fs
+        tattFeats = x * tAA
 
-        tattFeats = torch.einsum('blns,blnd->bls', x, tAA)  ### n x fs
-        # print(tattFeats.shape)
-        # import sys; sys.exit()
+        # print(x.shape, 'before')
+        # print(x.shape, 'after')
+
+        # x = x.view(B, L // self.k, self.k, D)
+        # print(x.shape)
+
+        # x = self.intra_region(x)
+        # x = self.inter_region(x)
 
 
-        tAA2 = self.attention2(tattFeats)
-        # print(tAA2[0, :, 0].sum())
-        tattFeats = torch.einsum('bls,bld->bs', tattFeats, tAA2)  ### n x fs
+        tattFeats = x
 
-        # print(tattFeats.shape)
+
+        tattFeats = tattFeats.sum(dim=-2)
+
+        # tattFeats = self.last_norm(tattFeats)
+
         logits = self.fc2(tattFeats)
 
-        # import sys; sys.exit()
-
-
-
-        # print(logits)
-        # print(logits.shape, logits.view(-1, self.num_classes).shape, labels.view(-1).shape)
-        # torch.Size([128, 3, 224, 224]) torch.Size([128])
-        # print(logits.shape)
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
             loss = loss_fct(logits.view(-1, self.num_classes), labels.view(-1))

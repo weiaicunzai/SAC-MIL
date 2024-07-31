@@ -194,7 +194,7 @@ def main():
     trainable_parameters += list(dimReduction.parameters())
     trainable_parameters += list(attCls.parameters())
 
-    # optimizer_adam0 = torch.optim.Adam(trainable_parameters, lr=params.lr,  weight_decay=params.weight_decay)
+    optimizer_adam0 = torch.optim.Adam(trainable_parameters, lr=params.lr,  weight_decay=params.weight_decay)
     print(params.lr, params.weight_decay)
     optimizer_adam1 = torch.optim.Adam(attCls.parameters(), lr=params.lr,  weight_decay=params.weight_decay)
 
@@ -216,8 +216,8 @@ def main():
                                                 #    optimizer0=optimizer_adam0, optimizer1=optimizer_adam1, epoch=ii, params=params, f_log=log_file, writer=writer, numGroup=params.numGroup, total_instance=params.total_instance, distill=params.distill_type)
 
         train_attention_preFeature_DTFD(classifier=classifier, dimReduction=dimReduction, attention=attention, UClassifier=attCls, mDATA_list=(SlideNames_train), ce_cri=ce_cri,
-                                                #    optimizer0=optimizer_adam0, optimizer1=optimizer_adam1, epoch=ii, params=params, f_log=log_file, writer=writer, numGroup=params.numGroup, total_instance=params.total_instance, distill=params.distill_type, feat_path=feat_path)
-                                                   optimizer0=None, optimizer1=optimizer_adam1, epoch=ii, params=params, f_log=log_file, writer=writer, numGroup=params.numGroup, total_instance=params.total_instance, distill=params.distill_type, feat_path=feat_path)
+                                                   optimizer0=optimizer_adam0, optimizer1=optimizer_adam1, epoch=ii, params=params, f_log=log_file, writer=writer, numGroup=params.numGroup, total_instance=params.total_instance, distill=params.distill_type, feat_path=feat_path)
+                                                #    optimizer0=None, optimizer1=optimizer_adam1, epoch=ii, params=params, f_log=log_file, writer=writer, numGroup=params.numGroup, total_instance=params.total_instance, distill=params.distill_type, feat_path=feat_path)
 
         print_log(f'>>>>>>>>>>> Validation Epoch: {ii}', log_file)
         # auc_val = test_attention_DTFD_preFeat_MultipleMean(classifier=classifier, dimReduction=dimReduction, attention=attention,
@@ -467,8 +467,8 @@ def train_attention_preFeature_DTFD(mDATA_list, classifier, dimReduction, attent
                 tAA = attention(tmidFeat).squeeze(0)
                 tattFeats = torch.einsum('ns,n->ns', tmidFeat, tAA)  ### n x fs
                 tattFeat_tensor = torch.sum(tattFeats, dim=0).unsqueeze(0)  ## 1 x fs
-                #tPredict = classifier(tattFeat_tensor)  ### 1 x 2
-                #slide_sub_preds.append(tPredict)
+                tPredict = classifier(tattFeat_tensor)  ### 1 x 2
+                slide_sub_preds.append(tPredict)
 
                 # patch_pred_logits = get_cam_1d(classifier, tattFeats.unsqueeze(0)).squeeze(0)  ###  cls x n
                 # patch_pred_logits = torch.transpose(patch_pred_logits, 0, 1)  ## n x cls
@@ -494,29 +494,27 @@ def train_attention_preFeature_DTFD(mDATA_list, classifier, dimReduction, attent
 
             slide_pseudo_feat = torch.cat(slide_pseudo_feat, dim=0)  ### numGroup x fs
             ## optimization for the first tier
-            #slide_sub_preds = torch.cat(slide_sub_preds, dim=0) ### numGroup x fs
-            #slide_sub_labels = torch.cat(slide_sub_labels, dim=0) ### numGroup
-            # loss0 = ce_cri(slide_sub_preds, slide_sub_labels).mean()
+            slide_sub_preds = torch.cat(slide_sub_preds, dim=0) ### numGroup x fs
+            slide_sub_labels = torch.cat(slide_sub_labels, dim=0) ### numGroup
+            loss0 = ce_cri(slide_sub_preds, slide_sub_labels).mean()
             # optimizer0.zero_grad()
-            # loss0.backward(retain_graph=True)
-            #torch.nn.utils.clip_grad_norm_(dimReduction.parameters(), params.grad_clipping)
-            #torch.nn.utils.clip_grad_norm_(attention.parameters(), params.grad_clipping)
-            #torch.nn.utils.clip_grad_norm_(classifier.parameters(), params.grad_clipping)
+            loss0.backward(retain_graph=True)
+            torch.nn.utils.clip_grad_norm_(dimReduction.parameters(), params.grad_clipping)
+            torch.nn.utils.clip_grad_norm_(attention.parameters(), params.grad_clipping)
+            torch.nn.utils.clip_grad_norm_(classifier.parameters(), params.grad_clipping)
             # optimizer0.step()
 
             ## optimization for the second tier
             gSlidePred = UClassifier(slide_pseudo_feat)
             loss1 = ce_cri(gSlidePred, tslideLabel).mean()
             optimizer1.zero_grad()
-            loss1.backward(retain_graph=True)
+            # loss1.backward(retain_graph=True)
+            loss1.backward()
             torch.nn.utils.clip_grad_norm_(UClassifier.parameters(), params.grad_clipping)
-            torch.nn.utils.clip_grad_norm_(dimReduction.parameters(), params.grad_clipping)
-            torch.nn.utils.clip_grad_norm_(attention.parameters(), params.grad_clipping)
-            torch.nn.utils.clip_grad_norm_(classifier.parameters(), params.grad_clipping)
-            # optimizer0.step()
+            optimizer0.step()
             optimizer1.step()
 
-            # Train_Loss0.update(loss0.item(), numGroup)
+            Train_Loss0.update(loss0.item(), numGroup)
             Train_Loss1.update(loss1.item(), 1)
 
         if idx % params.train_show_freq == 0:
