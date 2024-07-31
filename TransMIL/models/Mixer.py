@@ -597,9 +597,13 @@ class MlpMixer(nn.Module):
         # x = self.pad_k(x)
         # print(x.shape, 'cccc')
 
+        # print(x.shape)
+        x = self.pad_k(x)
+        # print(x.shape, 'after')
+
         x = self.fc1(x)
 
-        # x = self.pre_norm(x)
+        x = self.pre_norm(x)
         # x = x.view(B, self.num_tokens, L // self.num_tokens, D)
         # x = self.layer1(x)
         # x = self.layer2(x)
@@ -625,10 +629,10 @@ class MlpMixer(nn.Module):
 
         tattFeats = x
 
+        tattFeats = self.last_norm(tattFeats)
+
 
         tattFeats = tattFeats.sum(dim=-2)
-
-        # tattFeats = self.last_norm(tattFeats)
 
         logits = self.fc2(tattFeats)
 

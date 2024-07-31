@@ -39,10 +39,10 @@ def main(cfg):
     cfg.callbacks = load_callbacks(cfg)
 
     #---->Define Data
-    DataInterface_dict = {'train_batch_size': cfg.Data.train_dataloader.batch_size,
-                'train_num_workers': cfg.Data.train_dataloader.num_workers,
-                'test_batch_size': cfg.Data.test_dataloader.batch_size,
-                'test_num_workers': cfg.Data.test_dataloader.num_workers,
+    DataInterface_dict = {'train_batch_size': 1,
+                'train_num_workers': 4,
+                'test_batch_size': 1,
+                'test_num_workers': 4,
                 # 'dataset_name': cfg.Data.dataset_name,
                 'fold': 0,
                 'data_root': '/data/smb/syh/WSI_cls/cam16',
@@ -59,6 +59,7 @@ def main(cfg):
                             'data': cfg.Data,
                             'log': cfg.log_path
                             }
+
     model = ModelInterface(**ModelInterface_dict)
 
     #---->Instantiate Trainer

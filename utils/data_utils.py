@@ -103,8 +103,8 @@ class WSIDataset(Dataset):
         full_path = os.path.join(self.feat_dir, '{}.pt'.format(slide_id))
         features = torch.load(full_path)
 
-        # idx = torch.load(os.path.join(self.idx, slide_id + '.pt')).long()
-        # features = features[idx]
+        idx = torch.load(os.path.join(self.idx, slide_id + '.pt')).long()
+        features = features[idx]
 
         #----> shuffle
         # if self.shuffle == True:

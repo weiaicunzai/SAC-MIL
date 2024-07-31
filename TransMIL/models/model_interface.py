@@ -137,3 +137,5 @@ class  ModelInterface(pl.LightningModule):
         else:
             raise ValueError("wrong model name")
         self.model = model
+
+        print(self.model)

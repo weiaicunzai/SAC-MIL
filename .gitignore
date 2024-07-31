@@ -57,3 +57,7 @@ baseline_only_intra_region
 cam16_1.7m
 cc.py
 run.sh
+transmil_based_attn
+transmil_based_attn_pad_k
+transmil_based_attn_pad_k_pre_norm
+transmil_based_attn_pad_k_pre_norm_last_norm
