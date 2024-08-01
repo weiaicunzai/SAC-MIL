@@ -212,12 +212,21 @@ class Attention_Gated(nn.Module):
 #         pred = self.classifier(afeat) ## K x num_cls
 #         return pred
 
-class IntraRegion(nn.Module):
+class InterRegion(nn.Module):
 
     # def __init__(self, )
     def __init__(self, hidden_dim, k):
+        super().__init__()
         self.hidden_dim = hidden_dim
         self.k = k
+        self.inter_fc = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU()
+        )
+        self.intra_fc = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU()
+        )
 
     def unroll(self, x):
         D = x.shape[-1]
@@ -234,6 +243,43 @@ class IntraRegion(nn.Module):
         res = torch.cat(res, dim=-1)
 
         return res
+
+    def cal_region(self, x):
+        centroids = x[:, :, :1, :]
+        rest = x[:, :, 1:, :]
+
+        num_set = int(centroids.shape[1] / self.k) * self.k
+
+        left = centroids[:, :num_set, :, :]
+
+        # print(left.shape) [1, 128, 1, 512]
+        B, L, T, D = left.shape
+        left = left.view(B, -1, self.k, D)
+        left = self.roll(left)
+        left = self.inter_fc(left)
+        left = self.unroll(left)
+        left = self.intra_fc(left)
+        left = left.view(B, L, T, D)
+
+
+        # print(left.shape, centroids.shape, num_set, self.k)
+        if centroids.shape[1] != num_set * self.k:
+            right = centroids[:, num_set:, :]
+            assert right.shape[1] < self.k
+
+            right = self.roll(right)
+            right = self.inter_fc(right)
+            right = self.unroll(right)
+            right = self.intra_fc(right)
+
+            centroids = torch.cat([left, right], dim=1)
+
+        else:
+            centroids = left
+
+        x = torch.cat([centroids, rest], dim=2)
+
+        return x
 
     def roll(self, x):
         D = x.shape[-1]
@@ -282,7 +328,6 @@ class IntraRegion(nn.Module):
         total_len = L
         centroids = x[:, :, :1, :]
         rest = x[:, :, 1:, :]
-        # print(centroids.shape)
         B, L, R, D = centroids.shape
         centroids = centroids.view(B, L, D)
         centroids = self.roll(centroids)
@@ -291,8 +336,6 @@ class IntraRegion(nn.Module):
         centroids = self.intra_fc(centroids)
         centroids = centroids.view(B, L, R, D)
         x = torch.cat([centroids, rest], dim=2)
-
-
 
         # restore one dimension
         x = x.view(B, -1, D)
@@ -304,25 +347,23 @@ class IntraRegion(nn.Module):
 
 
 
-class InterRegion(nn.Module):
+class IntraRegion(nn.Module):
     def __init__(self, hidden_dim, k):
         super().__init__()
 
         self.k = k
         self.inter_fc = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU()
+            # nn.ReLU()
         )
         self.intra_fc = nn.Sequential(
-            nn.Linear(
-                hidden_dim,
-                hidden_dim
-            ),
-            nn.ReLU()
+            nn.Linear(hidden_dim, hidden_dim),
+            # nn.ReLU()
         )
 
         self.pre_norm = nn.LayerNorm(hidden_dim)
         self.norm = nn.LayerNorm(hidden_dim)
+        self.relu = nn.ReLU()
 
     def forward(self, x):
 
@@ -330,12 +371,14 @@ class InterRegion(nn.Module):
         B, L, D = x.shape
         res = x
 
-
         x = x.view(B, L // self.k, self.k, D)
+        # tmp = x
         x = self.roll(x)
         x = self.inter_fc(x)
         x = self.unroll(x)
         x = self.intra_fc(x)
+        x = self.relu(x)
+        # print((x - tmp).sum())
 
         x = x.view(B, L, D)
 
@@ -369,15 +412,78 @@ class InterRegion(nn.Module):
 
         res = []
         for idx, chunk in enumerate(x):
-            # print(chunk.shape, idx)
-            # print(chunk[0, 0, :, 0])
             chunk = torch.roll(chunk, idx, dims=-2)
-            # print(chunk[0, 0, :, 0])
-            # print(idx)
             res.append(chunk)
 
         res = torch.cat(res, dim=-1)
-        # print(res[0, 0, 3, 8*3: 8 * 4], tmp)
+
+        return res
+
+class Interaction(nn.Module):
+    def __init__(self, hidden_dim, k):
+        super().__init__()
+
+        self.k = k
+        self.inter_fc = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU()
+        )
+        self.intra_fc = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU()
+        )
+
+        self.pre_norm = nn.LayerNorm(hidden_dim)
+        self.norm = nn.LayerNorm(hidden_dim)
+
+    def forward(self, x):
+
+        # x = self.pre_norm(x)
+        B, L, D = x.shape
+        res = x
+
+        x = x.view(B, L // self.k, self.k, D)
+        # x = self.roll(x)
+        # x = self.inter_fc(x)
+        # x = self.unroll(x)
+        x = self.intra_fc(x)
+
+        x = x.view(B, L, D)
+
+        # x = x + res
+        # x = self.norm(x)
+
+        return x
+
+    def unroll(self, x):
+        D = x.shape[-1]
+        x = x.split(
+            D // self.k,
+            dim=-1
+        )
+
+        res = []
+        for idx, chunk in enumerate(x):
+            chunk = torch.roll(chunk, -idx, dims=-2)
+            res.append(chunk)
+
+        res = torch.cat(res, dim=-1)
+
+        return res
+
+    def roll(self, x):
+        D = x.shape[-1]
+        x = x.split(
+            D // self.k,
+            dim=-1
+        )
+
+        res = []
+        for idx, chunk in enumerate(x):
+            chunk = torch.roll(chunk, idx, dims=-2)
+            res.append(chunk)
+
+        res = torch.cat(res, dim=-1)
 
         return res
 
@@ -390,8 +496,11 @@ class MlpMixer(nn.Module):
         # self.token_dim = token_dim
 
         # net_dim = 512
-        self.fc1 = DimReduction(input_dim, m_dim=hidden_dim)
-        # self.fc1 = nn.Linear(input_dim, hidden_dim)
+        # self.fc1 = DimReduction(input_dim, m_dim=hidden_dim)
+        self.fc1 = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU()
+        )
 
         self.attention =  Attention_Gated(hidden_dim)
 
@@ -399,7 +508,8 @@ class MlpMixer(nn.Module):
         # self.channel_dim = channel_dim
         self.k = 64
 
-        self.intra_region = InterRegion(hidden_dim, self.k)
+        self.intra_region = IntraRegion(hidden_dim, self.k)
+        # self.inter_region = InterRegion(hidden_dim, self.k)
 
         # self.attention2 = Attention_Gated(hidden_dim)
         # self.channel_mix = nn.Sequential(
@@ -418,7 +528,6 @@ class MlpMixer(nn.Module):
         #     nn.Linear(hidden_dim, hidden_dim),
         #     nn.ReLU(inplace=True),
         # )
-
 
         self.fc2 = nn.Linear(hidden_dim, self.num_classes)
 
@@ -478,43 +587,42 @@ class MlpMixer(nn.Module):
     #     return x
 
 
-    def cal_region(self, x):
-        centroids = x[:, :, :1, :]
-        rest = x[:, :, 1:, :]
+    # def cal_region(self, x):
+    #     centroids = x[:, :, :1, :]
+    #     rest = x[:, :, 1:, :]
 
-        num_set = int(centroids.shape[1] / self.k) * self.k
+    #     num_set = int(centroids.shape[1] / self.k) * self.k
 
-        left = centroids[:, :num_set, :, :]
+    #     left = centroids[:, :num_set, :, :]
 
-        # print(left.shape) [1, 128, 1, 512]
-        B, L, T, D = left.shape
-        left = left.view(B, -1, self.k, D)
-        left = self.roll(left)
-        left = self.inter_fc(left)
-        left = self.unroll(left)
-        left = self.intra_fc(left)
-        left = left.view(B, L, T, D)
+    #     # print(left.shape) [1, 128, 1, 512]
+    #     B, L, T, D = left.shape
+    #     left = left.view(B, -1, self.k, D)
+    #     left = self.roll(left)
+    #     left = self.inter_fc(left)
+    #     left = self.unroll(left)
+    #     left = self.intra_fc(left)
+    #     left = left.view(B, L, T, D)
 
 
-        # print(left.shape, centroids.shape, num_set, self.k)
-        if centroids.shape[1] != num_set * self.k:
-            right = centroids[:, num_set:, :]
-            assert right.shape[1] < self.k
+    #     # print(left.shape, centroids.shape, num_set, self.k)
+    #     if centroids.shape[1] != num_set * self.k:
+    #         right = centroids[:, num_set:, :]
+    #         assert right.shape[1] < self.k
 
-            right = self.roll(right)
-            right = self.inter_fc(right)
-            right = self.unroll(right)
-            right = self.intra_fc(right)
+    #         right = self.roll(right)
+    #         right = self.inter_fc(right)
+    #         right = self.unroll(right)
+    #         right = self.intra_fc(right)
 
-            centroids = torch.cat([left, right], dim=1)
+    #         centroids = torch.cat([left, right], dim=1)
 
-        else:
-            centroids = left
+    #     else:
+    #         centroids = left
 
-        # print(type(centroids), type(rest))
-        x = torch.cat([centroids, rest], dim=2)
+    #     x = torch.cat([centroids, rest], dim=2)
 
-        return x
+    #     return x
 
     #def inter_region(self, x):
     #    # tmp = x.shape
@@ -591,6 +699,8 @@ class MlpMixer(nn.Module):
         # x = x.flatten(2)
         # x = x.transpose(-1, -2)
 
+        # [1, 2, 3, 4, 5, 6]
+        # [5, , 3, 4]
         # for block in self.layer:
             # x = block(x)
         # print(x.shape)
@@ -603,7 +713,7 @@ class MlpMixer(nn.Module):
 
         x = self.fc1(x)
 
-        x = self.pre_norm(x)
+        # x = self.pre_norm(x)
         # x = x.view(B, self.num_tokens, L // self.num_tokens, D)
         # x = self.layer1(x)
         # x = self.layer2(x)
@@ -613,9 +723,11 @@ class MlpMixer(nn.Module):
         # print(x.shape)
 
         # x = self.intra_region(x)
-        tAA = self.attention(x)
+        # x = self.inter_region(x)
+        # tAA = self.attention(x)
+        # x = x * self.attention(x)
         # tattFeats = torch.einsum('bls,bld->bs', x, tAA)  ### n x fs
-        tattFeats = x * tAA
+        # tattFeats = x * tAA
 
         # print(x.shape, 'before')
         # print(x.shape, 'after')
@@ -627,14 +739,14 @@ class MlpMixer(nn.Module):
         # x = self.inter_region(x)
 
 
-        tattFeats = x
+        # tattFeats = x
 
-        tattFeats = self.last_norm(tattFeats)
+        # x = self.last_norm(x)
 
 
-        tattFeats = tattFeats.sum(dim=-2)
+        x = x.mean(dim=-2)
 
-        logits = self.fc2(tattFeats)
+        logits = self.fc2(x)
 
         Y_hat = torch.argmax(logits, dim=1)
         Y_prob = F.softmax(logits, dim = 1)
