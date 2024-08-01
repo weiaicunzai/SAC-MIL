@@ -71,12 +71,15 @@ def main(cfg):
         # gpus=cfg.General.gpus,
         devices=[int(args.gpus)],
         # amp_level=cfg.General.amp_level,
-        precision=cfg.General.precision,
+        # precision=cfg.General.precision,
+        precision='16-mixed',
         # accumulate_grad_batches=cfg.General.grad_acc,
         # deterministic=True,
         check_val_every_n_epoch=1,
     )
 
+    # import
+    # print(type(trainer))
     #---->train or test
     if cfg.General.server == 'train':
         trainer.fit(model = model, datamodule = dm)

@@ -708,12 +708,12 @@ class MlpMixer(nn.Module):
         # print(x.shape, 'cccc')
 
         # print(x.shape)
-        x = self.pad_k(x)
+        # x = self.pad_k(x)
         # print(x.shape, 'after')
 
         x = self.fc1(x)
 
-        # x = self.pre_norm(x)
+        x = self.pre_norm(x)
         # x = x.view(B, self.num_tokens, L // self.num_tokens, D)
         # x = self.layer1(x)
         # x = self.layer2(x)
