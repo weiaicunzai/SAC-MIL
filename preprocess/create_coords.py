@@ -207,9 +207,16 @@ def main():
         # import sys; sys.exit()
 
         # torch.save()
-        idx_file = os.path.join(idx_path, os.path.basename(h5_path).replace('.h5', '.pt'))
-        torch.save(idx, idx_file)
-        print(idx_file)
+        # idx_file = os.path.join(idx_path, os.path.basename(h5_path).replace('.h5', '.pt'))
+        # torch.save(idx, idx_file)
+        # print(idx_file)
+
+        coords = norm_coords(coords)
+        # print(coords[idx])
+        # coords = coords[idx]
+        # print(idx.shape)
+        # print(coords.shape)
+        print(coords)
 
 
 
