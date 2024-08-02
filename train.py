@@ -4,6 +4,9 @@ from __future__ import absolute_import, division, print_function
 import logging
 import argparse
 import os
+import sys
+sys.path.append(os.getcwd())
+
 import random
 import numpy as np
 
@@ -16,13 +19,24 @@ from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
 from models.modeling import MlpMixer, CONFIGS
+from models.transmil import TransMIL
 from utils.scheduler import WarmupLinearSchedule, WarmupCosineSchedule
 from utils.data_utils import get_loader
 from utils.dist_utils import get_world_size
 
+# from conf.settings import co
+from conf import settings
+
 
 logger = logging.getLogger(__name__)
 
+import torchmetrics
+metrics = torchmetrics.MetricCollection([
+                torchmetrics.Accuracy(num_classes=2, average = 'macro', task='MULTICLASS'),
+                torchmetrics.AUROC(num_classes=2, average = 'macro', task='MULTICLASS'),
+                torchmetrics.F1Score(num_classes=2, average = 'macro', task='MULTICLASS'),
+            ]
+        )
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -52,49 +66,63 @@ def save_model(args, model):
     torch.save(model_to_save.state_dict(), model_checkpoint)
     logger.info("Saved model checkpoint to [DIR: %s]", args.output_dir)
 
-
 def setup(args):
     # Prepare model
     config = CONFIGS[args.model_type]
 
-    num_classes = 10
+    num_classes = 2
 
-    model = MlpMixer(config, args.img_size, num_classes=num_classes, patch_size=16, zero_head=True)
-    if args.pretrained_dir:
-        print(f"Loading pretrained model from {args.pretrained_dir}")
-        try:
-            pretrained_data = np.load(args.pretrained_dir)
-            model.load_from(pretrained_data)
-        except Exception as e:
-            print(f"Error loading pretrained model: {e}")
-    else:
-        print("No pretrained directory provided")
-    if args.pretrained_dir:
-        print(f"Loading pretrained model from {args.pretrained_dir}")
-        if not os.path.isfile(args.pretrained_dir):
-            raise FileNotFoundError(f"File {args.pretrained_dir} does not exist")
+    if args.dataset_name == 'cam16':
+        wsi_len = settings.cam16_wsi_len
+        print(wsi_len)
 
-        if args.pretrained_dir.endswith('.npz'):
-            try:
-                pretrained_data = np.load(args.pretrained_dir)
-                model.load_from(pretrained_data)
-            except Exception as e:
-                print(f"Error loading pretrained model: {e}")
-        else:
-            print(f"Expected a .npz file, but got {args.pretrained_dir}")
-    else:
-        print("No pretrained directory provided")
-    if args.pretrained_dir:
-        print(f"Loading pretrained model from {args.pretrained_dir}")
-        try:
-            pretrained_data = np.load(args.pretrained_dir, allow_pickle=True)
-            model.load_from(pretrained_data)
-        except Exception as e:
-            print(f"Error loading pretrained model: {e}")
-    else:
-        print("No pretrained directory provided")
+    # model = MlpMixer(
+    #     input_dim=1024,
+    #     hidden_dim=512,
+    #     seq_len=wsi_len,
+    #     token_dim=256,
+    #     channel_dim=512,
+    #     num_tokens=196,
+    #     num_classes=num_classes
+    # )
 
-    print("路径是：", args.pretrained_dir)
+    # print(model)
+    model = TransMIL(2)
+    # if args.pretrained_dir:
+    #     print(f"Loading pretrained model from {args.pretrained_dir}")
+    #     try:
+    #         pretrained_data = np.load(args.pretrained_dir)
+    #         model.load_from(pretrained_data)
+    #     except Exception as e:
+    #         print(f"Error loading pretrained model: {e}")
+    # else:
+    #     print("No pretrained directory provided")
+    # if args.pretrained_dir:
+    #     print(f"Loading pretrained model from {args.pretrained_dir}")
+    #     if not os.path.isfile(args.pretrained_dir):
+    #         raise FileNotFoundError(f"File {args.pretrained_dir} does not exist")
+
+    #     if args.pretrained_dir.endswith('.npz'):
+    #         try:
+    #             pretrained_data = np.load(args.pretrained_dir)
+    #             model.load_from(pretrained_data)
+    #         except Exception as e:
+    #             print(f"Error loading pretrained model: {e}")
+    #     else:
+    #         print(f"Expected a .npz file, but got {args.pretrained_dir}")
+    # else:
+    #     print("No pretrained directory provided")
+    # if args.pretrained_dir:
+    #     print(f"Loading pretrained model from {args.pretrained_dir}")
+    #     try:
+    #         pretrained_data = np.load(args.pretrained_dir, allow_pickle=True)
+    #         model.load_from(pretrained_data)
+    #     except Exception as e:
+    #         print(f"Error loading pretrained model: {e}")
+    # else:
+    #     print("No pretrained directory provided")
+
+    # print("路径是：", args.pretrained_dir)
     # model.load_from(np.load(args.pretrained_dir))
     model.to(args.device)
     num_params = count_parameters(model)
@@ -104,11 +132,9 @@ def setup(args):
     logger.info("Total Parameter: \t%2.1fM" % num_params)
     return args, model
 
-
 def count_parameters(model):
     params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     return params/1000000
-
 
 def set_seed(args):
     random.seed(args.seed)
@@ -116,7 +142,6 @@ def set_seed(args):
     torch.manual_seed(args.seed)
     if args.n_gpu > 0:
         torch.cuda.manual_seed_all(args.seed)
-
 
 def valid(args, model, writer, test_loader, global_step):
     # Validation!
@@ -134,40 +159,59 @@ def valid(args, model, writer, test_loader, global_step):
                           dynamic_ncols=True,
                           disable=args.local_rank not in [-1, 0])
     loss_fct = torch.nn.CrossEntropyLoss()
+    preds = []
+    gts = []
     for step, batch in enumerate(epoch_iterator):
         batch = tuple(t.to(args.device) for t in batch)
         x, y = batch
         with torch.no_grad():
             logits = model(x)
 
+            # print(logits.shape)
+            prob = torch.nn.functional.softmax(logits, dim=-1)
+
             eval_loss = loss_fct(logits, y)
             eval_losses.update(eval_loss.item())
 
-            preds = torch.argmax(logits, dim=-1)
+            # pred = torch.argmax(logits, dim=-1)
+            preds.append(prob)
 
-        if len(all_preds) == 0:
-            all_preds.append(preds.detach().cpu().numpy())
-            all_label.append(y.detach().cpu().numpy())
-        else:
-            all_preds[0] = np.append(
-                all_preds[0], preds.detach().cpu().numpy(), axis=0
-            )
-            all_label[0] = np.append(
-                all_label[0], y.detach().cpu().numpy(), axis=0
-            )
+            gts.append(y)
+
+
+        # if len(all_preds) == 0:
+        #     all_preds.append(preds.detach().cpu().numpy())
+        #     all_label.append(y.detach().cpu().numpy())
+        # else:
+        #     all_preds[0] = np.append(
+        #         all_preds[0], preds.detach().cpu().numpy(), axis=0
+        #     )
+        #     all_label[0] = np.append(
+        #         all_label[0], y.detach().cpu().numpy(), axis=0
+        #     )
+
         epoch_iterator.set_description("Validating... (loss=%2.5f)" % eval_losses.val)
 
-    all_preds, all_label = all_preds[0], all_label[0]
-    accuracy = simple_accuracy(all_preds, all_label)
+    preds = torch.cat(preds, dim=0)
+    gts = torch.cat(gts, dim=0)
+    val_res = metrics.to(args.device)(preds, gts)
+    metrics.reset()
 
-    logger.info("\n")
-    logger.info("Validation Results")
-    logger.info("Global Steps: %d" % global_step)
-    logger.info("Valid Loss: %2.5f" % eval_losses.avg)
-    logger.info("Valid Accuracy: %2.5f" % accuracy)
+    # all_preds, all_label = all_preds[0], all_label[0]
+    # accuracy = simple_accuracy(all_preds, all_label)
 
-    writer.add_scalar("test/accuracy", scalar_value=accuracy, global_step=global_step)
-    return accuracy
+    # logger.info("\n")
+    # logger.info("Validation Results")
+    # logger.info("Global Steps: %d" % global_step)
+    # logger.info("Valid Loss: %2.5f" % eval_losses.avg)
+    # logger.info("Valid Accuracy: %2.5f" % accuracy)
+
+    # writer.add_scalar("test/accuracy", scalar_value=accuracy, global_step=global_step)
+
+    print('Validation: ', val_res)
+
+    # return val_res['MulticlassAccuracy']
+    return val_res
 
 
 def train(args, model):
@@ -181,26 +225,13 @@ def train(args, model):
     # Prepare dataset
     train_loader, test_loader = get_loader(args)
 
-    # Prepare optimizer and scheduler
-    optimizer = torch.optim.SGD(model.parameters(),
-                                lr=args.learning_rate,
-                                momentum=0.9,
-                                weight_decay=args.weight_decay)
-    t_total = args.num_steps
-    if args.decay_type == "cosine":
-        scheduler = WarmupCosineSchedule(optimizer, warmup_steps=args.warmup_steps, t_total=t_total)
-    else:
-        scheduler = WarmupLinearSchedule(optimizer, warmup_steps=args.warmup_steps, t_total=t_total)
+    optimizer = torch.optim.Adam(
+        model.parameters(),
+        lr=args.learning_rate,
+        weight_decay=args.weight_decay,
+    )
 
-    if args.fp16:
-        model, optimizer = amp.initialize(models=model,
-                                          optimizers=optimizer,
-                                          opt_level=args.fp16_opt_level)
-        amp._amp_state.loss_scalers[0]._loss_scale = 2**20
-
-    # Distributed training
-    if args.local_rank != -1:
-        model = DDP(model, message_size=250000000, gradient_predivide_factor=get_world_size())
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [100], gamma=0.2)
 
     # Train!
     logger.info("***** Running training *****")
@@ -214,8 +245,10 @@ def train(args, model):
     model.zero_grad()
     set_seed(args)  # Added here for reproducibility (even between python 2 and 3)
     losses = AverageMeter()
-    global_step, best_acc = 0, 0
-    while True:
+    # global_step, best_acc = 0, 0
+    best_acc = None
+    # while True:
+    for e_idx in range(args.num_steps):
         model.train()
         epoch_iterator = tqdm(train_loader,
                               desc="Training (X / X Steps) (loss=X.X)",
@@ -223,10 +256,12 @@ def train(args, model):
                               dynamic_ncols=True,
                               disable=args.local_rank not in [-1, 0])
         for step, batch in enumerate(epoch_iterator):
+            # print(step, '................', len(train_loader.dataset))
             batch = tuple(t.to(args.device) for t in batch)
             x, y = batch
             # print(x.shape, y.shape)
             loss = model(x, y)
+            # print('hello???')
 
             if args.gradient_accumulation_steps > 1:
                 loss = loss / args.gradient_accumulation_steps
@@ -242,39 +277,60 @@ def train(args, model):
                     torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), args.max_grad_norm)
                 else:
                     torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
-                scheduler.step()
                 optimizer.step()
                 optimizer.zero_grad()
-                global_step += 1
 
+
+                # if args.local_rank in [-1, 0]:
+                #     writer.add_scalar("train/loss", scalar_value=losses.val, global_step=e_idx)
+                #     writer.add_scalar("train/lr", scalar_value=scheduler.get_lr()[0], global_step=e_idx)
+                # if global_step % args.eval_every == 0 and args.local_rank in [-1, 0]:
+                #     accuracy = valid(args, model, writer, test_loader, global_step)
+                #     if best_acc < accuracy:
+                #         save_model(args, model)
+                #         best_acc = accuracy
+                #     model.train()
                 epoch_iterator.set_description(
-                    "Training (%d / %d Steps) (loss=%2.5f)" % (global_step, t_total, losses.val)
+                    "Training (%d / %d Step) (loss=%2.5f)" % (step, len(train_loader.dataset), losses.val)
                 )
-                if args.local_rank in [-1, 0]:
-                    writer.add_scalar("train/loss", scalar_value=losses.val, global_step=global_step)
-                    writer.add_scalar("train/lr", scalar_value=scheduler.get_lr()[0], global_step=global_step)
-                if global_step % args.eval_every == 0 and args.local_rank in [-1, 0]:
-                    accuracy = valid(args, model, writer, test_loader, global_step)
-                    if best_acc < accuracy:
-                        save_model(args, model)
-                        best_acc = accuracy
-                    model.train()
 
-                if global_step % t_total == 0:
-                    break
+        val_res = valid(args, model, writer, test_loader, e_idx)
+        accuracy =  val_res['MulticlassAccuracy']
+        if best_acc is None:
+            best_acc = val_res
+
+        if best_acc['MulticlassAccuracy'] < accuracy:
+            save_model(args, model)
+            best_acc = val_res
+
+        print('best performance: ', best_acc)
+
+        if args.local_rank in [-1, 0]:
+            writer.add_scalar("train/loss", scalar_value=losses.val, global_step=e_idx)
+            writer.add_scalar("train/lr", scalar_value=scheduler.get_lr()[0], global_step=e_idx)
+
+        model.train()
+
         losses.reset()
-        if global_step % t_total == 0:
-            break
+
+        # global_step += 1
+        scheduler.step()
+
+        # if global_step % t_total == 0:
+            # break
 
     if args.local_rank in [-1, 0]:
         writer.close()
     logger.info("Best Accuracy: \t%f" % best_acc)
     logger.info("End Training!")
 
-
 def main():
     parser = argparse.ArgumentParser()
     # Required parameters
+    parser.add_argument("--data_root", default='/data/smb/syh/WSI_cls/')
+    # parser.add_args
+    parser.add_argument('--dataset_name', required=True, type=str)
+    parser.add_argument('--fold', required=True, type=int)
     parser.add_argument("--name", required=True,
                         help="Name of this run. Used for monitoring.")
     parser.add_argument("--model_type", choices=["Mixer-B_16", "Mixer-L_16",
@@ -294,11 +350,14 @@ def main():
                         help="Run prediction on validation set every so many steps."
                              "Will always run one evaluation at the end of training.")
 
-    parser.add_argument("--learning_rate", default=3e-2, type=float,
+    #parser.add_argument("--learning_rate", default=3e-2, type=float,
+    #                    help="The initial learning rate for SGD.")
+    parser.add_argument("--learning_rate", default=1e-4, type=float,
                         help="The initial learning rate for SGD.")
-    parser.add_argument("--weight_decay", default=0, type=float,
+    parser.add_argument("--weight_decay", default=1e-4, type=float,
                         help="Weight deay if we apply some.")
-    parser.add_argument("--num_steps", default=10000, type=int,
+    # parser.add_argument("--num_steps", default=10000, type=int,
+    parser.add_argument("--num_steps", default=200, type=int,
                         help="Total number of training epochs to perform.")
     parser.add_argument("--decay_type", choices=["cosine", "linear"], default="cosine",
                         help="How to decay the learning rate.")
@@ -323,6 +382,12 @@ def main():
                              "0 (default value): dynamic loss scaling.\n"
                              "Positive power of 2: static loss scaling value.\n")
     args = parser.parse_args()
+
+    from datetime import datetime
+    DATE_FORMAT = '%A_%d_%B_%Y_%Hh_%Mm_%Ss'
+    TIME_NOW = datetime.now().strftime(DATE_FORMAT)
+
+    args.output_dir = os.path.join(args.output_dir, TIME_NOW)
 
     # Setup CUDA, GPU & distributed training
     if args.local_rank == -1:
@@ -354,9 +419,9 @@ def main():
     # Model & Tokenizer Setup
     args, model = setup(args)
 
+    # print('?????'); import sys; sys.exit()
     # Training
     train(args, model)
-
 
 if __name__ == "__main__":
     main()
