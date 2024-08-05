@@ -185,20 +185,22 @@ def main():
     args = parser.parse_args()
 
     h5_dir = os.path.join(data_root, args.dataset, 'feat_clam_resnet50', 'patch_size_256_at_mag_20', 'h5_files')
+    # h5_dir = os.path.join(data_root, args.dataset, 'feat_clam_resnet50', 'patch_size_256_at_mag_20', 'h5_files')
 
     img_dir = os.path.join(data_root, args.dataset, 'img')
 
     idx_path = os.path.join(data_root, args.dataset, 'idx_{}'.format(args.k))
+    pos_path = os.path.join(data_root, args.dataset, 'pos')
     os.makedirs(idx_path, exist_ok=True)
+    os.makedirs(pos_path, exist_ok=True)
     for h5_path in glob.iglob(os.path.join(h5_dir, '**', '*.h5'), recursive=True):
         coords = patch_coords(h5_path)
 
         # img = draw_points(img_dir, h5_path, coords, (0, 0, 255))
 
         # coords = norm_coords(coords)
-        # len(coords) / args.k
-        idx = fps(coords, math.ceil(len(coords) / args.k))
-        idx = knn(coords, idx, k=args.k)
+        # idx = fps(coords, math.ceil(len(coords) / args.k))
+        # idx = knn(coords, idx, k=args.k)
 
         # print(idx.shape)
         # img = draw_points(img_dir, h5_path, coords, (0, 0, 255))
@@ -216,7 +218,10 @@ def main():
         # coords = coords[idx]
         # print(idx.shape)
         # print(coords.shape)
-        print(coords)
+        # print(coords)
+        pos_file = os.path.join(pos_path, os.path.basename(h5_path).replace('.h5', '.pt'))
+        print(pos_file)
+        torch.save(coords, pos_file)
 
 
 

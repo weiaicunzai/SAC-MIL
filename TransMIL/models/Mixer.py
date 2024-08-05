@@ -10,6 +10,8 @@ from torch import nn
 from torch.nn.modules.utils import _pair
 import torch.nn.functional as F
 
+from models.Pos import RotaryEmbedding
+
 
 TOK_FC_0 = "token_mixing/Dense_0"
 TOK_FC_1 = "token_mixing/Dense_1"
@@ -373,17 +375,17 @@ class IntraRegion(nn.Module):
 
         x = x.view(B, L // self.k, self.k, D)
         # tmp = x
-        x = self.roll(x)
-        x = self.inter_fc(x)
-        x = self.unroll(x)
-        x = self.intra_fc(x)
-        x = self.relu(x)
+        # x = self.roll(x)
+        # x = self.inter_fc(x)
+        # x = self.unroll(x)
+        # x = self.intra_fc(x)
+        # x = self.relu(x)
         # print((x - tmp).sum())
 
         x = x.view(B, L, D)
 
-        x = x + res
-        x = self.norm(x)
+        # x = x + res
+        # x = self.norm(x)
 
         return x
 
@@ -487,6 +489,14 @@ class Interaction(nn.Module):
 
         return res
 
+class Rope(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.dim = dim
+
+    def forward(self, len):
+        print(len)
+
 class MlpMixer(nn.Module):
     def __init__(self, input_dim, hidden_dim, num_classes=2):
         super().__init__()
@@ -558,6 +568,8 @@ class MlpMixer(nn.Module):
         # self.layer.append(copy.deepcopy(layer))
         self.last_norm = nn.LayerNorm(hidden_dim)
         self.pre_norm = nn.LayerNorm(hidden_dim)
+
+        self.pos_emb = RotaryEmbedding(hidden_dim)
 
     def pad_k(self, x):
         # x = self.()
@@ -693,6 +705,7 @@ class MlpMixer(nn.Module):
 
         x = kwargs['data'].float() #[B, n, 1024]
 
+        pos = kwargs['pos']
         # label =
 
         # x = self.stem(x)
@@ -713,7 +726,10 @@ class MlpMixer(nn.Module):
 
         x = self.fc1(x)
 
-        x = self.pre_norm(x)
+        # x = self.pos_emb(x, pos)
+
+        # x = self.pre_norm(x)
+        # x = self.intra_region(x)
         # x = x.view(B, self.num_tokens, L // self.num_tokens, D)
         # x = self.layer1(x)
         # x = self.layer2(x)

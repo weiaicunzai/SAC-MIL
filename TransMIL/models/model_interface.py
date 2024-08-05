@@ -60,9 +60,9 @@ class  ModelInterface(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         #---->inference
         # data, label, slide_id = batch
-        data, label = batch
+        data, pos, label = batch
 
-        results_dict = self.model(data=data, label=label)
+        results_dict = self.model(data=data, pos=pos, label=label)
 
         logits = results_dict['logits']
 
@@ -76,11 +76,11 @@ class  ModelInterface(pl.LightningModule):
         pass
 
     def validation_step(self, batch, batch_idx):
-        data, label = batch
+        data, pos, label = batch
         # print('val_slide', slide_id, label)
 
         with torch.no_grad():
-            results_dict = self.model(data=data, label=label)
+            results_dict = self.model(data=data, pos=pos, label=label)
 
 
 

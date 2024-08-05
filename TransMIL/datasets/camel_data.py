@@ -75,6 +75,11 @@ class WSIDataset(data.Dataset):
             "idx_64"
         )
 
+        self.pos = os.path.join(
+            self.data_root,
+            'pos'
+        )
+
         dataset_name = os.path.basename(self.data_root)
         self.file_list_csv = os.path.join('dataset_csv', 'dataset_list', dataset_name, '{}.csv'.format(dataset_name))
         self.split_dir = os.path.join('dataset_csv', 'splits',  dataset_name)
@@ -141,6 +146,7 @@ class WSIDataset(data.Dataset):
         idx = torch.load(os.path.join(self.idx, slide_id + '.pt')).long()
         features = features[idx]
 
+        pos = torch.load(os.path.join(self.pos, slide_id, + '.pt'))
         #----> shuffle
         # if self.shuffle == True:
 
@@ -150,5 +156,6 @@ class WSIDataset(data.Dataset):
             index = [x for x in range(features.shape[0])]
             random.shuffle(index)
             features = features[index]
+            pos = pos[index]
 
-        return features, label
+        return features, pos, label
