@@ -356,35 +356,34 @@ class IntraRegion(nn.Module):
         self.k = k
         self.inter_fc = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
-            # nn.ReLU()
+            nn.ReLU()
         )
         self.intra_fc = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
-            # nn.ReLU()
+        #     # nn.ReLU()
         )
 
         self.pre_norm = nn.LayerNorm(hidden_dim)
-        self.norm = nn.LayerNorm(hidden_dim)
-        self.relu = nn.ReLU()
+        # self.norm = nn.LayerNorm(hidden_dim)
+        # self.relu = nn.ReLU()
 
     def forward(self, x):
 
-        x = self.pre_norm(x)
         B, L, D = x.shape
         res = x
-
+        x = self.pre_norm(x)
         x = x.view(B, L // self.k, self.k, D)
         # tmp = x
-        # x = self.roll(x)
-        # x = self.inter_fc(x)
-        # x = self.unroll(x)
-        # x = self.intra_fc(x)
+        x = self.roll(x)
+        x = self.inter_fc(x)
+        x = self.unroll(x)
+        x = self.intra_fc(x)
         # x = self.relu(x)
         # print((x - tmp).sum())
 
         x = x.view(B, L, D)
 
-        # x = x + res
+        x = x + res
         # x = self.norm(x)
 
         return x
@@ -436,13 +435,13 @@ class Interaction(nn.Module):
         )
 
         self.pre_norm = nn.LayerNorm(hidden_dim)
-        self.norm = nn.LayerNorm(hidden_dim)
+        # self.norm = nn.LayerNorm(hidden_dim)
 
     def forward(self, x):
 
-        # x = self.pre_norm(x)
         B, L, D = x.shape
         res = x
+        # x = self.pre_norm(x)
 
         x = x.view(B, L // self.k, self.k, D)
         # x = self.roll(x)
@@ -512,13 +511,14 @@ class MlpMixer(nn.Module):
             nn.ReLU()
         )
 
-        self.attention =  Attention_Gated(hidden_dim)
+        # self.attention =  Attention_Gated(hidden_dim)
 
         # self.num_tokens = num_tokens
         # self.channel_dim = channel_dim
         self.k = 64
 
         self.intra_region = IntraRegion(hidden_dim, self.k)
+
         # self.inter_region = InterRegion(hidden_dim, self.k)
 
         # self.attention2 = Attention_Gated(hidden_dim)
@@ -728,8 +728,10 @@ class MlpMixer(nn.Module):
 
         # x = self.pos_emb(x, pos)
 
+        x = self.pad_k(x)
+
         # x = self.pre_norm(x)
-        # x = self.intra_region(x)
+        x = self.intra_region(x)
         # x = x.view(B, self.num_tokens, L // self.num_tokens, D)
         # x = self.layer1(x)
         # x = self.layer2(x)

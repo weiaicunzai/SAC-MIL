@@ -146,7 +146,8 @@ class WSIDataset(data.Dataset):
         idx = torch.load(os.path.join(self.idx, slide_id + '.pt')).long()
         features = features[idx]
 
-        pos = torch.load(os.path.join(self.pos, slide_id, + '.pt'))
+        pos = torch.load(os.path.join(self.pos, slide_id + '.pt'))
+        # pos = pos[idx]
         #----> shuffle
         # if self.shuffle == True:
 
