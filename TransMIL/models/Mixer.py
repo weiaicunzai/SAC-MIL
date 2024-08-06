@@ -570,7 +570,7 @@ class MlpMixer(nn.Module):
 
         # self.layer.append(copy.deepcopy(layer))
         # self.last_norm = nn.LayerNorm(hidden_dim)
-        self.pre_norm = nn.LayerNorm(hidden_dim)
+        # self.pre_norm = nn.LayerNorm(hidden_dim)
 
         # self.pos_emb = RotaryEmbedding(hidden_dim, scale=128)
 
