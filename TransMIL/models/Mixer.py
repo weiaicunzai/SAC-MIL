@@ -517,9 +517,10 @@ class MlpMixer(nn.Module):
         # self.channel_dim = channel_dim
         self.k = 64
 
-        # self.intra_region = IntraRegion(hidden_dim, self.k)
         self.intra_region = nn.Sequential(
-            IntraRegionK(hidden_dim, self.k, self.k ** 1)
+            IntraRegionK(hidden_dim, self.k, self.k ** 1),
+            IntraRegionK(hidden_dim, self.k, self.k ** 2),
+            # IntraRegionK(hidden_dim, self.k, self.k ** 3)
         )
         # self.intra_region1 = IntraRegionK(hidden_dim, self.k, region_size=self.k**1)
         # self.intra_region2 = IntraRegionK(hidden_dim, self.k, region_size=self.k**2)
@@ -739,6 +740,7 @@ class MlpMixer(nn.Module):
         # x = self.pre_norm(x)
         # print(x.shape)
         x = self.intra_region(x)
+
         # x = self.intra_region1(x)
         # print(x.shape)
         # x = self.intra_region2(x)
@@ -792,6 +794,8 @@ class IntraRegionK(nn.Module):
         self.k = k
         self.region_size = region_size
         self.scale = int(self.k ** (math.log(self.region_size, self.k) - 1))
+
+        # print(self.scale)
 
         self.inter_fc = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
