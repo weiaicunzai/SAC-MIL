@@ -2,6 +2,7 @@ from __future__ import annotations
 # from math import pi, log
 
 import torch
+import torch.nn as nn
 from torch.nn import Module
 from torch.cuda.amp import autocast
 from torch import einsum
@@ -40,12 +41,18 @@ class RotaryEmbedding(Module):
     def __init__(
         self,
         dim,
+        scale,
         theta = 10000,
     ):
         super().__init__()
 
         self.theta = theta
         self.dim = dim
+        # pos_dim =
+        assert self.dim % 4 == 0
+        pos_dim = self.dim // 2
+        self.freqs = nn.Parameter(1. / (self.theta ** (torch.arange(0, pos_dim, 2)[:(pos_dim // 2)].float() / pos_dim)), requires_grad=False)
+        self.scale = scale
 
     @property
     def device(self):
@@ -53,15 +60,19 @@ class RotaryEmbedding(Module):
 
     @autocast(enabled = False)
     def forward(self, t, pos):
+        pos = self.scale * pos
+
         pos_x = pos[:, :, 0]
         pos_y = pos[:, :, 1]
 
         freq_x = self.encode_freqs(pos_x)
         freq_y = self.encode_freqs(pos_y)
 
+        print(freq_x)
+
 
         freqs = torch.cat([freq_x, freq_y], dim=-1)
-        print(freqs.shape)
+        # print(freqs.shape)
 
         return  apply_rotary_emb(freqs, t)
 
@@ -72,10 +83,11 @@ class RotaryEmbedding(Module):
     ):
 
         # half pos
-        assert self.dim % 4 == 0
-        pos_dim = self.dim // 2
-        freqs = 1. / (self.theta ** (torch.arange(0, pos_dim, 2)[:(pos_dim // 2)].float() / pos_dim))
-
+        # assert self.dim % 4 == 0
+        # pos_dim = self.dim // 2
+        # freqs = 1. / (self.theta ** (torch.arange(0, pos_dim, 2)[:(pos_dim // 2)].float() / pos_dim))
+        freqs = self.freqs
+        # print(pos.device, freqs.device)
         freqs = einsum('..., f -> ... f', pos.type(freqs.dtype), freqs)
         freqs = repeat(freqs, '... n -> ... (n r)', r = 2)
 
