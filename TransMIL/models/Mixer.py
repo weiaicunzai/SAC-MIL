@@ -517,7 +517,10 @@ class MlpMixer(nn.Module):
         # self.channel_dim = channel_dim
         self.k = 64
 
-        self.intra_region = IntraRegion(hidden_dim, self.k)
+        # self.intra_region = IntraRegion(hidden_dim, self.k)
+        self.intra_region = nn.Sequential(
+            IntraRegionK(hidden_dim, self.k, self.k ** 1)
+        )
         # self.intra_region1 = IntraRegionK(hidden_dim, self.k, region_size=self.k**1)
         # self.intra_region2 = IntraRegionK(hidden_dim, self.k, region_size=self.k**2)
         # self.intra_region3 = IntraRegionK(hidden_dim, self.k, region_size=self.k**3)
@@ -572,7 +575,7 @@ class MlpMixer(nn.Module):
         # self.last_norm = nn.LayerNorm(hidden_dim)
         # self.pre_norm = nn.LayerNorm(hidden_dim)
 
-        self.pos_emb = RotaryEmbedding(hidden_dim, scale=1)
+        # self.pos_emb = RotaryEmbedding(hidden_dim, scale=1)
 
     def pad_k(self, x):
         # x = self.()
@@ -729,9 +732,9 @@ class MlpMixer(nn.Module):
 
         x = self.fc1(x)
 
-        x = self.pos_emb(x, pos)
+        # x = self.pos_emb(x, pos)
 
-        x = self.pad_k(x)
+        # x = self.pad_k(x)
 
         # x = self.pre_norm(x)
         # print(x.shape)
