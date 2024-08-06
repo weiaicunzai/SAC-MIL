@@ -520,7 +520,7 @@ class MlpMixer(nn.Module):
         self.intra_region = nn.Sequential(
             IntraRegionK(hidden_dim, self.k, self.k ** 1),
             IntraRegionK(hidden_dim, self.k, self.k ** 2),
-            # IntraRegionK(hidden_dim, self.k, self.k ** 3)
+            IntraRegionK(hidden_dim, self.k, self.k ** 3)
         )
         # self.intra_region1 = IntraRegionK(hidden_dim, self.k, region_size=self.k**1)
         # self.intra_region2 = IntraRegionK(hidden_dim, self.k, region_size=self.k**2)
