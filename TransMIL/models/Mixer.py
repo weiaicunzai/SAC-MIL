@@ -576,7 +576,7 @@ class MlpMixer(nn.Module):
         # self.last_norm = nn.LayerNorm(hidden_dim)
         # self.pre_norm = nn.LayerNorm(hidden_dim)
 
-        # self.pos_emb = RotaryEmbedding(hidden_dim, scale=1)
+        self.pos_emb = RotaryEmbedding(hidden_dim, scale=1)
 
     def pad_k(self, x):
         # x = self.()
@@ -733,7 +733,7 @@ class MlpMixer(nn.Module):
 
         x = self.fc1(x)
 
-        # x = self.pos_emb(x, pos)
+        x = self.pos_emb(x, pos)
 
         # x = self.pad_k(x)
 

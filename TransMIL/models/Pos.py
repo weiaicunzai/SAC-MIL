@@ -68,8 +68,6 @@ class RotaryEmbedding(Module):
         freq_x = self.encode_freqs(pos_x)
         freq_y = self.encode_freqs(pos_y)
 
-        print(freq_x)
-
 
         freqs = torch.cat([freq_x, freq_y], dim=-1)
         # print(freqs.shape)
