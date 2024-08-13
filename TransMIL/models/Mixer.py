@@ -733,7 +733,7 @@ class MlpMixer(nn.Module):
 
         x = self.fc1(x)
 
-        x = self.pos_emb(x, pos)
+        # x = self.pos_emb(x, pos)
 
         # x = self.pad_k(x)
 
