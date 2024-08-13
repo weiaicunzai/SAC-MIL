@@ -815,22 +815,14 @@ class IntraRegionK(nn.Module):
         # B, L, D = x.shape
         res = x
         x = self.pre_norm(x)
-        # x = x.view(B, L // self.k, self.k, D)
-        # tmp = x
-        # x = self.roll(x)
         # tmp = x
         x = self.roll_all(x)
         x = self.inter_fc(x)
         x = self.unroll_all(x)
         # print((x - tmp).mean())
         x = self.intra_fc(x)
-        # x = self.relu(x)
-        # print((x - tmp).sum())
-
-        # x = x.view(B, L, D)
 
         x = x + res
-        # x = self.norm(x)
 
         return x
 
@@ -937,3 +929,24 @@ class IntraRegionK(nn.Module):
 # inputs = torch.randn(1, 100, 512)
 
 # out = net(inputs)
+
+# net = IntraRegionK(513, 64)
+
+# inputs = torch.randn(1, 100, 512)
+
+# out = net(inputs)
+
+# k = 4
+# dim = 8
+# len = 33
+
+# torch.set_printoptions(linewidth=200)
+# net = IntraRegionK(dim,  k, k ** 3)
+
+# a = [torch.arange(len) for i in range(dim)]
+# a = torch.stack(a, dim=-1).unsqueeze(dim=0)
+# inputs = a
+# out = net(inputs)
+# print(net.region_size)
+# print(net.k)
+# print(net.scale)
