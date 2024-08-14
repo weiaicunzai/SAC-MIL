@@ -20,11 +20,9 @@ class  ModelInterface(pl.LightningModule):
         super(ModelInterface, self).__init__()
         self.save_hyperparameters()
         self.load_model(model)
-        # self.loss = create_loss(loss)
         self.loss = nn.CrossEntropyLoss()
         self.optimizer = optimizer
         self.log_path = kargs['log']
-        self.ce_loss = nn.CrossEntropyLoss()
 
         self.num_classes = 2
 
@@ -60,6 +58,8 @@ class  ModelInterface(pl.LightningModule):
         loss = self.loss(logits, label)
 
 
+        # tmp = list(self.model.fc1[0].parameters())[0]
+        # print(tmp)
         return {'loss': loss}
 
     def on_train_epoch_end(self):
@@ -103,6 +103,20 @@ class  ModelInterface(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = create_optimizer(self.optimizer, self.model)
         return [optimizer]
+
+        # return torch.optim.Adam(self.parameters(), lr=0.0001)
+
+        # optimizer = torch.optim.AdamW(self.parameters(), lr=0.05)
+        # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
+        # return {
+        #     'optimizer': optimizer,
+        #     'lr_scheduler': {
+        #         'scheduler': scheduler,
+        #         'interval': 'epoch',  # 每个epoch调整一次学习率
+        #         'frequency': 1,       # 每个epoch调用一次
+        #         'monitor': 'val_loss'  # 监控验证集损失
+        #     }
+        # }
 
     def test_step(self, batch, batch_idx):
 
