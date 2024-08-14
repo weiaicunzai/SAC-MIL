@@ -92,3 +92,5 @@ test_pos_emb_scale1
 test_save
 two_interregionK
 without_pos_3k
+MyLoss1/
+test_loss_fn

@@ -1,20 +1,9 @@
-import sys
-import numpy as np
-import inspect
-import importlib
-import random
-import pandas as pd
-
 #---->
 from MyOptimizer import create_optimizer
-from MyLoss import create_loss
-# from MyLoss.infonce import InfoNCELoss
-# from utils.utils import cross_entropy_torch
 
 #---->
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torchmetrics
 
 #---->
@@ -125,11 +114,7 @@ class  ModelInterface(pl.LightningModule):
 
 
     def load_model(self, model):
-        if model == 'TransMIL':
-            from models.TransMIL import TransMIL
-            model = TransMIL(2)
-
-        elif model == 'Mixer':
+        if model == 'Mixer':
             from models.Mixer import MlpMixer
             model = MlpMixer(input_dim=1024, hidden_dim=512)
 
