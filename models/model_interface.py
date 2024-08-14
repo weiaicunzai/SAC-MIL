@@ -31,7 +31,8 @@ class  ModelInterface(pl.LightningModule):
         super(ModelInterface, self).__init__()
         self.save_hyperparameters()
         self.load_model(model)
-        self.loss = create_loss(loss)
+        # self.loss = create_loss(loss)
+        self.loss = nn.CrossEntropyLoss()
         self.optimizer = optimizer
         self.log_path = kargs['log']
         self.ce_loss = nn.CrossEntropyLoss()
@@ -81,8 +82,6 @@ class  ModelInterface(pl.LightningModule):
 
         with torch.no_grad():
             results_dict = self.model(data=data, pos=pos, label=label)
-
-
 
         logits = results_dict['logits']
         Y_prob = results_dict['Y_prob']
