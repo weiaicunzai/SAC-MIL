@@ -1,4 +1,4 @@
-import copy
+import math
 
 import torch
 
@@ -517,7 +517,14 @@ class MlpMixer(nn.Module):
         # self.channel_dim = channel_dim
         self.k = 64
 
-        self.intra_region = IntraRegion(hidden_dim, self.k)
+        self.intra_region = nn.Sequential(
+            IntraRegionK(hidden_dim, self.k, self.k ** 1),
+            IntraRegionK(hidden_dim, self.k, self.k ** 2),
+            IntraRegionK(hidden_dim, self.k, self.k ** 3)
+        )
+        # self.intra_region1 = IntraRegionK(hidden_dim, self.k, region_size=self.k**1)
+        # self.intra_region2 = IntraRegionK(hidden_dim, self.k, region_size=self.k**2)
+        # self.intra_region3 = IntraRegionK(hidden_dim, self.k, region_size=self.k**3)
 
         # self.inter_region = InterRegion(hidden_dim, self.k)
 
@@ -566,10 +573,10 @@ class MlpMixer(nn.Module):
         # )
 
         # self.layer.append(copy.deepcopy(layer))
-        self.last_norm = nn.LayerNorm(hidden_dim)
-        self.pre_norm = nn.LayerNorm(hidden_dim)
+        # self.last_norm = nn.LayerNorm(hidden_dim)
+        # self.pre_norm = nn.LayerNorm(hidden_dim)
 
-        self.pos_emb = RotaryEmbedding(hidden_dim)
+        self.pos_emb = RotaryEmbedding(hidden_dim, scale=1)
 
     def pad_k(self, x):
         # x = self.()
@@ -728,10 +735,16 @@ class MlpMixer(nn.Module):
 
         # x = self.pos_emb(x, pos)
 
-        x = self.pad_k(x)
+        # x = self.pad_k(x)
 
         # x = self.pre_norm(x)
+        # print(x.shape)
         x = self.intra_region(x)
+
+        # x = self.intra_region1(x)
+        # print(x.shape)
+        # x = self.intra_region2(x)
+        # x = self.intra_region3(x)
         # x = x.view(B, self.num_tokens, L // self.num_tokens, D)
         # x = self.layer1(x)
         # x = self.layer2(x)
@@ -770,3 +783,170 @@ class MlpMixer(nn.Module):
         Y_prob = F.softmax(logits, dim = 1)
         results_dict = {'logits': logits, 'Y_prob': Y_prob, 'Y_hat': Y_hat}
         return results_dict
+
+
+
+
+class IntraRegionK(nn.Module):
+    def __init__(self, hidden_dim, k, region_size):
+        super().__init__()
+
+        self.k = k
+        self.region_size = region_size
+        self.scale = int(self.k ** (math.log(self.region_size, self.k) - 1))
+
+        # print(self.scale)
+
+        self.inter_fc = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU()
+        )
+        self.intra_fc = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+        #     # nn.ReLU()
+        )
+
+        self.pre_norm = nn.LayerNorm(hidden_dim)
+        # self.norm = nn.LayerNorm(hidden_dim)
+        # self.relu = nn.ReLU()
+
+    def forward(self, x):
+
+        # B, L, D = x.shape
+        res = x
+        x = self.pre_norm(x)
+        # tmp = x
+        x = self.roll_all(x)
+        x = self.inter_fc(x)
+        x = self.unroll_all(x)
+        # print((x - tmp).mean())
+        x = self.intra_fc(x)
+
+        x = x + res
+
+        return x
+
+    def split_parts(self, n):
+        if n < self.region_size:
+            return n
+
+        # print('total', n, 'region size', self.region_size)
+        mod = n % self.region_size
+        # remain = self.region_size - mod
+        num_part1 = n - mod
+
+        assert num_part1 > 0
+
+
+        return num_part1
+
+    def roll_all(self, x):
+        num_tokens = x.shape[1]
+
+        # num_part1 = num_tokens - num_tokens % self.region_size
+        # print(num_part1)
+
+        num_part1 = self.split_parts(num_tokens)
+
+        part1 = x[:, :num_part1, :]
+        part2 = x[:, num_part1:, :]
+
+        part1 = self.roll(part1)
+        part2 = self.roll(part2)
+
+        return torch.cat([part1, part2], dim=-2)
+
+    def unroll_all(self, x):
+        num_tokens = x.shape[1]
+
+        num_part1 = self.split_parts(num_tokens)
+
+        part1 = x[:, :num_part1, :]
+        part2 = x[:, num_part1:, :]
+
+        part1 = self.unroll(part1)
+        part2 = self.unroll(part2)
+
+        return torch.cat([part1, part2], dim=-2)
+
+    def unroll(self, x):
+        if x.shape[-2] == 0:
+            return x
+
+        B, L, D = x.shape
+
+        if L >= self.region_size:
+            x = x.view(B, -1, self.region_size, D)
+
+        x = x.split(
+            D // self.k,
+            dim=-1
+        )
+
+        res = []
+
+        for idx, chunk in enumerate(x):
+            chunk = torch.roll(chunk, -idx * self.scale, dims=-2)
+            res.append(chunk)
+
+        res = torch.cat(res, dim=-1)
+
+        if L >= self.region_size:
+            res = res.view(B, L, D)
+
+        return res
+
+    def roll(self, x):
+
+        if x.shape[-2] == 0:
+            return x
+
+        B, L, D = x.shape
+
+        if L >= self.region_size:
+            x = x.view(B, -1, self.region_size, D)
+
+        x = x.split(
+            D // self.k,
+            dim=-1
+        )
+
+        res = []
+        for idx, chunk in enumerate(x):
+            chunk = torch.roll(chunk, idx * self.scale, dims=-2)
+            res.append(chunk)
+
+        res = torch.cat(res, dim=-1)
+
+        if L >= self.region_size:
+            res = res.view(B, L, D)
+
+        return res
+
+
+# net = IntraRegionK(512, 64)
+
+# inputs = torch.randn(1, 100, 512)
+
+# out = net(inputs)
+
+# net = IntraRegionK(513, 64)
+
+# inputs = torch.randn(1, 100, 512)
+
+# out = net(inputs)
+
+# k = 4
+# dim = 8
+# len = 33
+
+# torch.set_printoptions(linewidth=200)
+# net = IntraRegionK(dim,  k, k ** 3)
+
+# a = [torch.arange(len) for i in range(dim)]
+# a = torch.stack(a, dim=-1).unsqueeze(dim=0)
+# inputs = a
+# out = net(inputs)
+# print(net.region_size)
+# print(net.k)
+# print(net.scale)
