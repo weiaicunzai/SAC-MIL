@@ -89,10 +89,10 @@ class WSIDataset(data.Dataset):
         pos = torch.load(os.path.join(self.pos, slide_id + '.pt'))
         pos = pos[idx]
 
-        if self.data_set == 'train':
-            index = [x for x in range(features.shape[0])]
-            random.shuffle(index)
-            features = features[index]
-            pos = pos[index]
+        # if self.data_set == 'train':
+        #     index = [x for x in range(features.shape[0])]
+        #     random.shuffle(index)
+        #     features = features[index]
+        #     pos = pos[index]
 
         return features, pos, label
