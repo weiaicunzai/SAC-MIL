@@ -1,2 +1,1 @@
-
-python train.py --stage='train' --config='Camelyon/TransMIL.yaml'  --gpus=2 --fold=0
+python train.py --stage='train'  --gpus=0 --fold=0

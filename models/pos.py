@@ -9,11 +9,11 @@ from torch import einsum
 
 from einops import rearrange, repeat
 
-def exists(val):
-    return val is not None
+# def exists(val):
+#     return val is not None
 
-def default(val, d):
-    return val if exists(val) else d
+# def default(val, d):
+#     return val if exists(val) else d
 
 def rotate_half(x):
     x = rearrange(x, '... (d r) -> ... d r', r = 2)
