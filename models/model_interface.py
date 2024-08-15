@@ -109,7 +109,7 @@ class  ModelInterface(pl.LightningModule):
 
     def load_model(self, model):
         if model == 'Mixer':
-            from models.Mixer import MlpMixer
+            from models.mixer import MlpMixer
             model = MlpMixer(input_dim=1024, hidden_dim=512)
 
         else:

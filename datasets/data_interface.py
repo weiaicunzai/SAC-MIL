@@ -77,11 +77,11 @@ class DataInterface(pl.LightningDataModule):
         #         'Invalid Dataset File Name or Invalid Class Name!')
 
         if self.dataset_name == 'WSIDataset':
-            from datasets.camel_data import WSIDataset
+            from datasets.wsi_dataset import WSIDataset
             self.data_module = WSIDataset
 
         if self.dataset_name == 'camel_name':
-            from datasets.camel_data import camel_data
+            from datasets.wsi_dataset import camel_data
             self.data_module = camel_data
 
     def instancialize(self, **other_args):

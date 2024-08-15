@@ -74,23 +74,11 @@ class WSIDataset(data.Dataset):
 
         return wsis
 
-    def pad_seq(self, features):
-        fact = self.wsi_len / features.shape[0] + 1
-
-        features = features.repeat(int(fact), 1)
-
-        features = features[:self.wsi_len, :]
-
-        assert features.shape[0] == self.wsi_len
-
-        return features
-
     def __len__(self):
         return len(self.wsis.keys())
 
     def __getitem__(self, idx):
         slide_id = self.slide_names[idx]
-        # print(slide_id)
         label = self.wsis[slide_id]
         full_path = os.path.join(self.feat_dir, '{}.pt'.format(slide_id))
         features = torch.load(full_path)
@@ -100,10 +88,6 @@ class WSIDataset(data.Dataset):
 
         pos = torch.load(os.path.join(self.pos, slide_id + '.pt'))
         # pos = pos[idx]
-        #----> shuffle
-        # if self.shuffle == True:
-
-        # features = self.pad_seq(features)
 
         if self.data_set == 'train':
             index = [x for x in range(features.shape[0])]

@@ -9,8 +9,6 @@ from torch import einsum
 
 from einops import rearrange, repeat
 
-# from typing import Literal
-
 def exists(val):
     return val is not None
 
@@ -48,7 +46,6 @@ class RotaryEmbedding(Module):
 
         self.theta = theta
         self.dim = dim
-        # pos_dim =
         assert self.dim % 4 == 0
         pos_dim = self.dim // 2
         self.freqs = nn.Parameter(1. / (self.theta ** (torch.arange(0, pos_dim, 2)[:(pos_dim // 2)].float() / pos_dim)), requires_grad=False)
@@ -70,7 +67,6 @@ class RotaryEmbedding(Module):
 
 
         freqs = torch.cat([freq_x, freq_y], dim=-1)
-        # print(freqs.shape)
 
         return  apply_rotary_emb(freqs, t)
 
@@ -80,26 +76,8 @@ class RotaryEmbedding(Module):
         pos,
     ):
 
-        # half pos
-        # assert self.dim % 4 == 0
-        # pos_dim = self.dim // 2
-        # freqs = 1. / (self.theta ** (torch.arange(0, pos_dim, 2)[:(pos_dim // 2)].float() / pos_dim))
         freqs = self.freqs
-        # print(pos.device, freqs.device)
         freqs = einsum('..., f -> ... f', pos.type(freqs.dtype), freqs)
         freqs = repeat(freqs, '... n -> ... (n r)', r = 2)
 
         return freqs
-
-
-
-# ros = RotaryEmbedding(8)
-# # # print(ros)
-
-# inter = torch.randn(1, 5, 16)
-# pos = torch.rand(1, 5, 2) * 1024
-# a = ros.encode_pos(inter, pos)
-# a = ros(inter, pos)
-# # print(a.shape)
-# print(inter[0, 0])
-# print(a[0, 0])

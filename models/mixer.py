@@ -5,7 +5,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-from models.Pos import RotaryEmbedding
+from models.pos import RotaryEmbedding
 
 
 class MlpMixer(nn.Module):

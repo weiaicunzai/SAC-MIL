@@ -20,9 +20,10 @@ import sys
 def make_parse():
     parser = argparse.ArgumentParser()
     parser.add_argument('--stage', default='train', type=str)
-    parser.add_argument('--config', default='Camelyon/TransMIL.yaml',type=str)
-    parser.add_argument('--gpus', default = [2])
-    parser.add_argument('--fold', default = 0)
+    parser.add_argument('--gpus', default=[2])
+    parser.add_argument('--fold', default=0)
+    parser.add_argument('--weights', default=None, type=str)
+
     args = parser.parse_args()
     return args
 
@@ -30,13 +31,13 @@ def make_parse():
 def main(cfg):
 
     #---->Initialize seed
-    pl.seed_everything(cfg.General.seed)
+    pl.seed_everything(2021)
 
     #---->load loggers
-    cfg.load_loggers = load_loggers(cfg)
+    loggers = load_loggers('logs')
 
     #---->load callbacks
-    cfg.callbacks = load_callbacks(cfg)
+    callbacks = load_callbacks(ckpt_path='ckpt_weights')
 
     #---->Define Data
     DataInterface_dict = {'train_batch_size': 1,
@@ -44,27 +45,32 @@ def main(cfg):
                 'test_batch_size': 1,
                 'test_num_workers': 4,
                 # 'dataset_name': cfg.Data.dataset_name,
-                'fold': 0,
+                'fold': args.fold,
                 'data_root': '/data/smb/syh/WSI_cls/cam16',
                 'dataset_name': 'WSIDataset',
-                'dataset_cfg': cfg.Data,}
+                # 'dataset_cfg': cfg.Data,
+                }
     dm = DataInterface(**DataInterface_dict)
 
     #---->Define Model
     ModelInterface_dict = {
                             'model': 'Mixer',
-                            'data': cfg.Data,
-                            'log': cfg.log_path
+                            'log': loggers
                             }
 
+    # print(cfg.log_path)
+    # print(cfg.Data)
     model = ModelInterface(**ModelInterface_dict)
 
     #---->Instantiate Trainer
     trainer = Trainer(
         num_sanity_val_steps=0,
-        logger=cfg.load_loggers,
-        callbacks=cfg.callbacks,
-        max_epochs= cfg.General.epochs,
+        # logger=cfg.load_loggers,
+        logger=loggers,
+        # callbacks=cfg.callbacks,
+        callbacks=callbacks,
+        # max_epochs= cfg.General.epochs,
+        max_epochs=200,
         # gpus=cfg.General.gpus,
         devices=[int(args.gpus)],
         # amp_level=cfg.General.amp_level,
@@ -75,29 +81,28 @@ def main(cfg):
         check_val_every_n_epoch=1,
     )
 
-    # import
-    # print(type(trainer))
-    #---->train or test
-    if cfg.General.server == 'train':
+    if args.stage == 'train':
         trainer.fit(model = model, datamodule = dm)
     else:
-        model_paths = list(cfg.log_path.glob('*.ckpt'))
-        model_paths = [str(model_path) for model_path in model_paths if 'epoch' in str(model_path)]
-        for path in model_paths:
-            print(path)
-            new_model = model.load_from_checkpoint(checkpoint_path=path, cfg=cfg)
-            trainer.test(model=new_model, datamodule=dm)
+        new_model = ModelInterface.load_from_checkpoint(checkpoint_path=args.weights, cfg=cfg)
+        trainer.test(model=new_model, datamodule=dm)
+        #model_paths = list(cfg.log_path.glob('*.ckpt'))
+        #model_paths = [str(model_path) for model_path in model_paths if 'epoch' in str(model_path)]
+        #for path in model_paths:
+        #    print(path)
+        #    # new_model = model.load_from_checkpoint(checkpoint_path=path, cfg=cfg)
+        #    trainer.test(model=new_model, datamodule=dm)
 
 if __name__ == '__main__':
 
     args = make_parse()
-    cfg = read_yaml(args.config)
+    # cfg = read_yaml(args.config)
 
     #---->update
-    cfg.config = args.config
-    cfg.General.gpus = args.gpus
-    cfg.General.server = args.stage
-    cfg.Data.fold = args.fold
+    # cfg.config = args.config
+    # cfg.General.gpus = args.gpus
+    # cfg.General.server = args.stage
+    # cfg.Data.fold = args.fold
 
     #---->main
-    main(cfg)
+    main(args)
