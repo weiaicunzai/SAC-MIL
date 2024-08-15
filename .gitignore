@@ -94,3 +94,10 @@ two_interregionK
 without_pos_3k
 MyLoss1/
 test_loss_fn
+MyOptimizer1/
+adam_0.0001
+adam_0.001
+adam_0.01
+adam_0.1
+test_optim_adam_lr_scheduler
+test_optimizer
