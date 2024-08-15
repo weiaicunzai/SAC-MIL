@@ -52,10 +52,7 @@ def main(cfg):
 
     #---->Define Model
     ModelInterface_dict = {
-                            # 'model': 'TransMIL',
                             'model': 'Mixer',
-                            'loss': cfg.Loss,
-                            'optimizer': cfg.Optimizer,
                             'data': cfg.Data,
                             'log': cfg.log_path
                             }

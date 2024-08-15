@@ -1,27 +1,21 @@
 #---->
-from MyOptimizer import create_optimizer
-
-#---->
 import torch
 import torch.nn as nn
 import torchmetrics
 
 #---->
 import pytorch_lightning as pl
-# from models.utils import ConTrasLoss
-
 
 
 # mem
 class  ModelInterface(pl.LightningModule):
 
     #---->init
-    def __init__(self, model, loss, optimizer,  **kargs):
+    def __init__(self, model, **kargs):
         super(ModelInterface, self).__init__()
         self.save_hyperparameters()
         self.load_model(model)
         self.loss = nn.CrossEntropyLoss()
-        self.optimizer = optimizer
         self.log_path = kargs['log']
 
         self.num_classes = 2
@@ -101,22 +95,8 @@ class  ModelInterface(pl.LightningModule):
         self.valid_metrics.reset()
 
     def configure_optimizers(self):
-        optimizer = create_optimizer(self.optimizer, self.model)
-        return [optimizer]
 
-        # return torch.optim.Adam(self.parameters(), lr=0.0001)
-
-        # optimizer = torch.optim.AdamW(self.parameters(), lr=0.05)
-        # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
-        # return {
-        #     'optimizer': optimizer,
-        #     'lr_scheduler': {
-        #         'scheduler': scheduler,
-        #         'interval': 'epoch',  # 每个epoch调整一次学习率
-        #         'frequency': 1,       # 每个epoch调用一次
-        #         'monitor': 'val_loss'  # 监控验证集损失
-        #     }
-        # }
+        return torch.optim.Adam(self.parameters(), lr=0.0001)
 
     def test_step(self, batch, batch_idx):
 
