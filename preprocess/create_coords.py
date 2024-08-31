@@ -2,12 +2,15 @@ import argparse
 import os
 import glob
 import math
+import random
 
 import h5py
 import cv2
 import torch
 import numpy as np
 import openslide
+
+import torch.nn as nn
 
 
 data_root = '/data/smb/syh/WSI_cls/'
@@ -61,6 +64,7 @@ def fps(points, n_samples):
     dists = np.ones_like(points_left) * float('inf') # [P]
 
     # Select a point from points by its index, save it
+    # selected = np.random.choice(points_left)
     selected = 0
     sample_inds[0] = points_left[selected]
 
@@ -74,16 +78,6 @@ def fps(points, n_samples):
         last_added = sample_inds[i-1]
 
         dist_to_last_added_point = ((points[last_added] - points[points_left]) ** 2).sum(-1)
-        # print(dist_to_last_added_point2)
-
-        # print(dist_to_last_added_point, 'ccc')
-        # print(dist_to_last_added_point ** 2, 'ccc')
-        # print(points[last_added].shape, points[points_left].shape)
-        # print(dist_to_last_added_point.shape)
-        # print(dist_to_last_added_point * dist_to_last_added_point)
-        # print(dist_to_last_added_point.dtype)
-        # import sys; sys.exit()
-
 
         # If closer, updated distances
         dists[points_left] = np.minimum(dist_to_last_added_point,
@@ -97,8 +91,101 @@ def fps(points, n_samples):
         # Update points_left
         points_left = np.delete(points_left, selected)
 
-    # return points[sample_inds]
     return sample_inds
+
+
+def assert_indices(masks, indices):
+    for idx in indices:
+        assert (idx == masks).sum() == 0
+        # if idx not in masks:
+            # print(idx)
+
+
+def knn_no_overlap(coords, idx, k):
+
+    output = []
+    coords = coords.long()
+    mask = torch.tensor(idx).long() # used instances
+    remain_instances = coords.shape[0]
+    pdist = nn.PairwiseDistance(p=2)
+
+
+    for i in idx:
+        diff = []
+        centroid = coords[i].clone()
+
+        tmp_coords = coords[mask].clone()
+        coords[mask] = centroid + 300000
+        coords[i] = centroid
+
+        # print(coords[i], centroid, mask, i, (mask == i).sum(), idx)
+        # continue
+        # coords[i] = centroid
+        # print(i, output)
+        # print('centroid', centroid)
+        # print('mask', mask)
+        # print(coords)
+        # print('ffff')
+        # print(tmp_coords)
+        # print('-----')
+        # print(coords)
+        # print('coords', i, coords)
+        # print(centroid)
+
+        # diff1 = ((centroid - coords) ** 2).sum(-1)
+        diff = pdist(centroid, coords)
+        # print((diff - diff1).mean())
+        # print((diff - diff1).mean())
+        # import sys; sys.exit()
+        assert remain_instances >= 0
+        if remain_instances > k:
+            tmp_k = k
+        else:
+            tmp_k = remain_instances
+        # indeces = torch.tensor(diff).topk(k=k, largest=False)[1]
+        # print(tmp_k)
+        indeces = torch.tensor(diff).topk(k=tmp_k, largest=False)[1]
+        # print(centroid)
+        # print(coords)
+        # print(diff)
+        # print(indeces[0], i, '-----')
+        # print(indeces)
+        # print(coords[indeces[0]], coords[i], centroid)
+        # print((mask == indeces[0]).sum())
+        assert indeces[0] == i
+        indeces = indeces[1:]  # the nearest point is itself, remove it.
+
+
+        output.append(torch.tensor([i]))
+        output.append(indeces)
+
+        # coords[mask] = tmp_coords
+        # print(mask)
+
+        # print(indeces, i)
+        # print((mask[indeces] == 1).long())
+        # assert mask[indeces].sum() == 0
+        assert_indices(mask, indeces)
+        coords[mask] = tmp_coords
+        # mask[indeces] = 1
+        # mask[i] = 1
+        remain_instances -= k
+        # print(remain_instances)
+
+        # mask[torch.cat(output)] = 1
+        # print(mask., indeces.dtype)
+        mask = torch.cat([mask, indeces])
+
+    output = torch.cat(output)
+
+    # import sys; sys.exit()
+    # remaining = []
+    # for i in range(len(coords)):
+    #     if (i == output).sum() == 0:
+    #         remaining.append(i)
+    # output = torch.cat([output, torch.tensor(remaining)])
+
+    return output
 
 def knn(coords, idx, k):
     # ddd
@@ -106,42 +193,45 @@ def knn(coords, idx, k):
     # coords = np.array(coords, dtype=np.uint64)
     output = []
     coords = coords.long()
+
+    # print(coords.shape)
     for i in idx:
         # print(i)
         diff = []
+        # print(coords.shape, i)
         centroid = coords[i]
-        # print(type(centroid))
         # for coord in coords:
         #     diff.append(
         #         np.linalg.norm(centroid - coord)
         #     )
 
-        # print(centroid.shape)
-        # print(coords.shape)
-        # print((centroid - coords).shape)
-
         diff = ((centroid - coords) ** 2).sum(-1)
-        # print(diff)
         indeces = torch.tensor(diff).topk(k=k, largest=False)[1]
         indeces = indeces[1:]  # the nearest point is itself, remove it.
 
-        # print(diff[indeces[0]])
         output.append(torch.tensor([i]))
         output.append(indeces)
+
+
 
     output = torch.cat(output)
 
     remaining = []
     for i in range(len(coords)):
         if (i == output).sum() == 0:
-            # print(i, output)
             remaining.append(i)
     output = torch.cat([output, torch.tensor(remaining)])
 
     return output
 
+def gen_color():
+    return (
+        random.randint(0, 255),
+        random.randint(0, 255),
+        random.randint(0, 255)
+    )
 
-def draw_points(img_dir, h5_path, coords, color):
+def draw_points(img_dir, h5_path, coords, idx, k):
     basename = os.path.basename(h5_path)
     basename = basename.replace('h5', 'tif')
 
@@ -158,21 +248,25 @@ def draw_points(img_dir, h5_path, coords, color):
     img = np.array(img)
     img = img[:, :, ::-1]
 
-    # print(type(img), img[33, 3])
-    # print(img.shape, img.dtype)
     cv2.imwrite('test.jpg', img)
     img = cv2.imread('test.jpg')
-    for coord in coords:
+
+    num_cen = math.ceil(len(coords) / k)
+    coords = coords[idx]
+    for i, coord in enumerate(coords):
+
+        # if write background
+        if i > num_cen * k:
+            continue
+
         coord = coord / downsample_factor
-        # print(type(coord))
         coord = coord.tolist()
         coord = [int(c) for c in coord]
-        # coord = [30, 30]
-        # img = np.zeros((400, 400, 3), np.uint8)
+        if i % k == 0 and i < num_cen * k:
+            color = gen_color()
+
         cv2.circle(img, coord, 3, color, 3)
 
-    # print(img.max())
-    # print(img.shape, img.dtype)
     return img
 
 def main():
@@ -196,31 +290,21 @@ def main():
     for h5_path in glob.iglob(os.path.join(h5_dir, '**', '*.h5'), recursive=True):
         coords = patch_coords(h5_path)
 
-        # img = draw_points(img_dir, h5_path, coords, (0, 0, 255))
+        # process and save index
+        cen_idx = fps(coords, math.ceil(len(coords) / args.k))
+        # idx = knn(coords, cen_idx, k=args.k)
+        cen_idx = knn_no_overlap(coords, cen_idx, k=args.k)
 
-        # coords = norm_coords(coords)
-        # idx = fps(coords, math.ceil(len(coords) / args.k))
-        # idx = knn(coords, idx, k=args.k)
+        # img = draw_points(img_dir, h5_path, coords, cen_idx, args.k)
+        # cv2.imwrite('test1.jpg', img)
 
-        # print(idx.shape)
-        # img = draw_points(img_dir, h5_path, coords, (0, 0, 255))
-        # cv2.imwrite('test.jpg', img)
-
-        # import sys; sys.exit()
-
-        # torch.save()
-        # idx_file = os.path.join(idx_path, os.path.basename(h5_path).replace('.h5', '.pt'))
-        # torch.save(idx, idx_file)
+        idx_file = os.path.join(idx_path, os.path.basename(h5_path).replace('.h5', '.pt'))
         # print(idx_file)
+        torch.save(cen_idx, idx_file)
 
+        # process and save coords
         coords = norm_coords(coords)
-        # print(coords[idx])
-        # coords = coords[idx]
-        # print(idx.shape)
-        # print(coords.shape)
-        # print(coords)
         pos_file = os.path.join(pos_path, os.path.basename(h5_path).replace('.h5', '.pt'))
-        print(pos_file)
         torch.save(coords, pos_file)
 
 
