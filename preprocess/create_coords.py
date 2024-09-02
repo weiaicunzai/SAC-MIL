@@ -292,15 +292,15 @@ def main():
 
         # process and save index
         cen_idx = fps(coords, math.ceil(len(coords) / args.k))
-        # idx = knn(coords, cen_idx, k=args.k)
-        cen_idx = knn_no_overlap(coords, cen_idx, k=args.k)
+        idx = knn(coords, cen_idx, k=args.k)
+        # idx = knn_no_overlap(coords, cen_idx, k=args.k)
 
         # img = draw_points(img_dir, h5_path, coords, cen_idx, args.k)
         # cv2.imwrite('test1.jpg', img)
 
         idx_file = os.path.join(idx_path, os.path.basename(h5_path).replace('.h5', '.pt'))
         # print(idx_file)
-        torch.save(cen_idx, idx_file)
+        torch.save(idx, idx_file)
 
         # process and save coords
         coords = norm_coords(coords)
