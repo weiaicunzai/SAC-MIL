@@ -92,9 +92,6 @@ class  ModelInterface(pl.LightningModule):
         self.valid_metrics.reset()
 
     def configure_optimizers(self):
-        # optimizer = create_optimizer(self.optimizer, self.model)
-        # return [optimizer]
-
         return torch.optim.Adam(self.model.parameters(), lr=0.0001)
 
     def test_step(self, batch, batch_idx):
