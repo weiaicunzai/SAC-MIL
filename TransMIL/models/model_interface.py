@@ -1,16 +1,3 @@
-import sys
-import numpy as np
-import inspect
-import importlib
-import random
-import pandas as pd
-
-#---->
-from MyOptimizer import create_optimizer
-from MyLoss import create_loss
-# from MyLoss.infonce import InfoNCELoss
-# from utils.utils import cross_entropy_torch
-
 #---->
 import torch
 import torch.nn as nn
@@ -19,11 +6,7 @@ import torchmetrics
 
 #---->
 import pytorch_lightning as pl
-# from models.utils import ConTrasLoss
 
-
-
-# mem
 class  ModelInterface(pl.LightningModule):
 
     #---->init
@@ -33,7 +16,6 @@ class  ModelInterface(pl.LightningModule):
         self.load_model(model)
         self.loss = nn.CrossEntropyLoss()
         self.optimizer = self.configure_optimizers()
-        # self.log_path = kargs['log']
 
         self.num_classes = 2
 

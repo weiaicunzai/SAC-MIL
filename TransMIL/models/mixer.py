@@ -292,15 +292,10 @@ class InterRegion(nn.Module):
 
         res = []
         for idx, chunk in enumerate(x):
-            # print(chunk.shape, idx)
-            # print(chunk[0, 0, :, 0])
             chunk = torch.roll(chunk, idx, dims=-2)
-            # print(chunk[0, 0, :, 0])
-            # print(idx)
             res.append(chunk)
 
         res = torch.cat(res, dim=-1)
-        # print(res[0, 0, 3, 8*3: 8 * 4], tmp)
 
         return res
 
@@ -343,11 +338,7 @@ class InterRegion(nn.Module):
         x = x.view(B, -1, D)
         x = x[:, :total_len, :]
 
-        # print(x.shape)
-
         return x
-
-
 
 class IntraRegion(nn.Module):
     def __init__(self, hidden_dim, k):
