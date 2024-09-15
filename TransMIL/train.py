@@ -3,11 +3,8 @@ import sys
 print(os.getcwd())
 sys.path.append(os.getcwd())
 import argparse
-from pathlib import Path
-import numpy as np
-import glob
 
-from datasets import DataInterface
+from datasets import WSIDataModule
 from models import ModelInterface
 from utils.utils import *
 
@@ -20,68 +17,46 @@ import sys
 def make_parse():
     parser = argparse.ArgumentParser()
     parser.add_argument('--stage', default='train', type=str)
-    parser.add_argument('--config', default='Camelyon/TransMIL.yaml',type=str)
-    parser.add_argument('--gpus', default = [2])
+    parser.add_argument('--gpus', default=0, required=True, type=int)
     parser.add_argument('--fold', default = 0)
+    parser.add_argument('--dataset', type=str, required=True)
+    parser.add_argument('--model', type=str, required=True, default='mixer')
     args = parser.parse_args()
     return args
 
 #---->main
-def main(cfg):
+def main(args):
 
     #---->Initialize seed
-    pl.seed_everything(cfg.General.seed)
+    pl.seed_everything(2023)
 
     #---->load loggers
-    cfg.load_loggers = load_loggers(cfg)
+    loggers = load_loggers('logs', args.dataset, args.fold)
 
     #---->load callbacks
-    cfg.callbacks = load_callbacks(cfg)
+    callbacks = load_callbacks('ckpt', args.dataset, args.fold)
 
     #---->Define Data
-    DataInterface_dict = {'train_batch_size': 1,
-                'train_num_workers': 4,
-                'test_batch_size': 1,
-                'test_num_workers': 4,
-                # 'dataset_name': cfg.Data.dataset_name,
-                'fold': 0,
-                'data_root': '/data/smb/syh/WSI_cls/cam16',
-                'dataset_name': 'WSIDataset',
-                'dataset_cfg': cfg.Data,}
-    dm = DataInterface(**DataInterface_dict)
+    data_root = '/data/smb/syh/WSI_cls/'
+    dataset_root = os.path.join(data_root, args.dataset)
+    dm = WSIDataModule(fold=args.fold, dataset_path=dataset_root)
 
     #---->Define Model
-    ModelInterface_dict = {
-                            # 'model': 'TransMIL',
-                            'model': 'Mixer',
-                            'loss': cfg.Loss,
-                            'optimizer': cfg.Optimizer,
-                            'data': cfg.Data,
-                            'log': cfg.log_path
-                            }
-
-    model = ModelInterface(**ModelInterface_dict)
+    model = ModelInterface(model=args.model)
 
     #---->Instantiate Trainer
     trainer = Trainer(
         num_sanity_val_steps=0,
-        logger=cfg.load_loggers,
-        callbacks=cfg.callbacks,
-        max_epochs= cfg.General.epochs,
-        # gpus=cfg.General.gpus,
+        logger=loggers,
+        callbacks=callbacks,
+        max_epochs= 200,
         devices=[int(args.gpus)],
-        # amp_level=cfg.General.amp_level,
-        # precision=cfg.General.precision,
         precision='16-mixed',
-        # accumulate_grad_batches=cfg.General.grad_acc,
-        # deterministic=True,
         check_val_every_n_epoch=1,
     )
 
-    # import
-    # print(type(trainer))
     #---->train or test
-    if cfg.General.server == 'train':
+    if args.stage == 'train':
         trainer.fit(model = model, datamodule = dm)
     else:
         model_paths = list(cfg.log_path.glob('*.ckpt'))
@@ -94,13 +69,6 @@ def main(cfg):
 if __name__ == '__main__':
 
     args = make_parse()
-    cfg = read_yaml(args.config)
-
-    #---->update
-    cfg.config = args.config
-    cfg.General.gpus = args.gpus
-    cfg.General.server = args.stage
-    cfg.Data.fold = args.fold
 
     #---->main
-    main(cfg)
+    main(args)
