@@ -3,6 +3,7 @@
 **/__pycache__/**
 **/__pycache__
 DTFD-MIL/save_model/
+DTFD-MIL
 **/LOG/*
 **/log.txt
 disk_useage
@@ -111,3 +112,4 @@ baseline1_intra_region_prenorm_res_connect_roll_unroll
 baseline1_intra_region_prenorm_res_connect_roll_unroll_inter_fc
 baseline1_intra_region_prenorm_res_connect_roll_unroll_inter_fc_relu
 baseline_1
+legacy

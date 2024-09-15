@@ -6,8 +6,6 @@ import torchmetrics
 #---->
 import pytorch_lightning as pl
 
-
-# mem
 class  ModelInterface(pl.LightningModule):
 
     #---->init
@@ -17,7 +15,6 @@ class  ModelInterface(pl.LightningModule):
         self.load_model(model)
         self.loss = nn.CrossEntropyLoss()
         self.optimizer = self.configure_optimizers()
-        # self.log_path = kargs['log']
 
         self.num_classes = 2
 
