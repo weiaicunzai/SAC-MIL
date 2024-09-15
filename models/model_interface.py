@@ -11,12 +11,13 @@ import pytorch_lightning as pl
 class  ModelInterface(pl.LightningModule):
 
     #---->init
-    def __init__(self, model, **kargs):
+    def __init__(self, model):
         super(ModelInterface, self).__init__()
         self.save_hyperparameters()
         self.load_model(model)
         self.loss = nn.CrossEntropyLoss()
-        self.log_path = kargs['log']
+        self.optimizer = self.configure_optimizers()
+        # self.log_path = kargs['log']
 
         self.num_classes = 2
 
@@ -95,8 +96,10 @@ class  ModelInterface(pl.LightningModule):
         self.valid_metrics.reset()
 
     def configure_optimizers(self):
+        # optimizer = create_optimizer(self.optimizer, self.model)
+        # return [optimizer]
 
-        return torch.optim.Adam(self.parameters(), lr=0.0001)
+        return torch.optim.Adam(self.model.parameters(), lr=0.0001)
 
     def test_step(self, batch, batch_idx):
 
@@ -108,7 +111,11 @@ class  ModelInterface(pl.LightningModule):
 
 
     def load_model(self, model):
-        if model == 'Mixer':
+        if model.lower() == 'transmil':
+            from models.TransMIL import TransMIL
+            model = TransMIL(2)
+
+        elif model.lower() == 'mixer':
             from models.mixer import MlpMixer
             model = MlpMixer(input_dim=1024, hidden_dim=512)
 

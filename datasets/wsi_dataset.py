@@ -2,10 +2,12 @@ import os
 import random
 import torch
 import pandas as pd
-from pathlib import Path
 
 import torch.utils.data as data
+<<<<<<<< HEAD:datasets/wsi_dataset.py
 from torch.utils.data import dataloader
+========
+>>>>>>>> c8e7a3c (ref: clean code):datasets/wsi_data.py
 
 
 class WSIDataset(data.Dataset):
@@ -84,11 +86,14 @@ class WSIDataset(data.Dataset):
         features = torch.load(full_path)
 
         idx = torch.load(os.path.join(self.idx, slide_id + '.pt')).long()
-        features = features[idx]
+        # features = features[idx]
 
         pos = torch.load(os.path.join(self.pos, slide_id + '.pt'))
         pos = pos[idx]
 
+        # print(full_path)
+        # print(os.path.join(self.pos, slide_id + '.pt'))
+        # print(pos.shape, features.shape)
         if self.data_set == 'train':
             index = [x for x in range(features.shape[0])]
             random.shuffle(index)
