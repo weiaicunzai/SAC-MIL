@@ -37,7 +37,7 @@ def main(args):
     callbacks = load_callbacks('ckpt', args.dataset, args.fold)
 
     #---->Define Data
-    data_root = os.path.join(os.path.dirname(__file__), 'dataset_csv')
+    data_root = '/data/smb/syh/WSI_cls/'
     dataset_root = os.path.join(data_root, args.dataset)
     dm = WSIDataModule(fold=args.fold, dataset_path=dataset_root)
 
