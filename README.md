@@ -27,3 +27,14 @@ python utils/draw_pos.py --dataset DATASET_NAME --norm
 # draw 2D index of each patch, 2D index is calculated as (X_coordinates / patch_size, Y_coordinates / patch_size)
 python utils/draw_pos.py --dataset DATASET_NAME
 ```
+
+requirements
+```
+pytorch                   1.13.1
+matplotlib                3.9.2
+openslide                 1.3.0
+torchmetrics              1.2.1
+h5py                      3.8.0
+pytorch_lightning         2.1.3
+pandas                    2.0.3
+```

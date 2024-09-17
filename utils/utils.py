@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 from datetime import datetime
 
 from pytorch_lightning.callbacks import ModelCheckpoint

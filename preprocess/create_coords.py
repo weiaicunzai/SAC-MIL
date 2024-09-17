@@ -5,10 +5,8 @@ import math
 import random
 
 import h5py
-import cv2
 import torch
 import numpy as np
-import openslide
 
 import torch.nn as nn
 
