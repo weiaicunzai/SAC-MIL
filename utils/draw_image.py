@@ -163,6 +163,8 @@ def main():
     parser.add_argument('--k', required=True, type=int)
     args = parser.parse_args()
 
+    assert args.dataset in ['cam16', 'brac', 'lung']
+
     h5_dir = os.path.join(data_root, args.dataset, 'feat_clam_resnet50', 'patch_size_256_at_mag_20', 'h5_files')
     img_dir = os.path.join(data_root, args.dataset, 'img')
 
@@ -171,9 +173,6 @@ def main():
     for slide in os.listdir(img_dir):
 
         slide_id, _ = os.path.splitext(slide)
-
-        if slide_id != 'TCGA-55-7903-01Z-00-DX1.40fc5dcb-b5bb-46b4-90bd-2eeb3ea880f5':
-             continue
 
         h5_path = os.path.join(h5_dir, slide_id + '.h5')
         coords = patch_coords(h5_path)
