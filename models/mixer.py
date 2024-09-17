@@ -1,5 +1,3 @@
-import copy
-
 import torch
 
 # import models.configs as configs
@@ -7,18 +5,9 @@ import torch
 # from os.path import join as pjoin
 
 from torch import nn
-from torch.nn.modules.utils import _pair
 import torch.nn.functional as F
 
 from models.pos import RotaryEmbedding
-
-
-TOK_FC_0 = "token_mixing/Dense_0"
-TOK_FC_1 = "token_mixing/Dense_1"
-CHA_FC_0 = "channel_mixing/Dense_0"
-CHA_FC_1 = "channel_mixing/Dense_1"
-PRE_NORM = "LayerNorm_0"
-POST_NORM = "LayerNorm_1"
 
 
 def np2th(weights, conv=False):

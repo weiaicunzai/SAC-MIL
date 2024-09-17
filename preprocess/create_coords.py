@@ -4,10 +4,8 @@ import glob
 import math
 
 import h5py
-import cv2
 import torch
 import numpy as np
-import openslide
 
 
 data_root = '/data/smb/syh/WSI_cls/'
