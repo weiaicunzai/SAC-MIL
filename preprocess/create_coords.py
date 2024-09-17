@@ -272,6 +272,8 @@ def main():
     parser.add_argument('--k', required=True, type=int)
     args = parser.parse_args()
 
+    assert args.dataset in ['cam16', 'lung', 'brac']
+
     h5_dir = os.path.join(data_root, args.dataset, 'feat_clam_resnet50', 'patch_size_256_at_mag_20', 'h5_files')
 
     idx_path = os.path.join(data_root, args.dataset, 'idx_{}'.format(args.k))

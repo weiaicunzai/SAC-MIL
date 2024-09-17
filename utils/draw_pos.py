@@ -60,7 +60,7 @@ def main():
     parser.add_argument('--norm', action='store_true', help='plot nomralized fig')
     args = parser.parse_args()
 
-    assert args.dataset in ['cam16', 'lung']
+    assert args.dataset in ['cam16', 'lung', 'brac']
 
     data_path = os.path.join(args.data_root, args.dataset)
     if args.norm:
