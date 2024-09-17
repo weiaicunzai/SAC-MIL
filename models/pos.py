@@ -46,6 +46,10 @@ class RotaryEmbedding(Module):
 
         self.theta = theta
         self.dim = dim
+        pos_dim = self.dim // 2
+        self.freqs = 1. / (self.theta ** (torch.arange(0, pos_dim, 2)[:(pos_dim // 2)].float() / pos_dim))
+        self.freqs = torch.nn.Parameter(self.freqs, requires_grad=False)
+
 
     @property
     def device(self):
@@ -61,7 +65,6 @@ class RotaryEmbedding(Module):
 
 
         freqs = torch.cat([freq_x, freq_y], dim=-1)
-        print(freqs.shape)
 
         return  apply_rotary_emb(freqs, t)
 
@@ -73,10 +76,10 @@ class RotaryEmbedding(Module):
 
         # half pos
         assert self.dim % 4 == 0
-        pos_dim = self.dim // 2
-        freqs = 1. / (self.theta ** (torch.arange(0, pos_dim, 2)[:(pos_dim // 2)].float() / pos_dim))
+        # pos_dim = self.dim // 2
+        # freqs = 1. / (self.theta ** (torch.arange(0, pos_dim, 2)[:(pos_dim // 2)].float() / pos_dim))
 
-        freqs = einsum('..., f -> ... f', pos.type(freqs.dtype), freqs)
+        freqs = einsum('..., f -> ... f', pos.type(self.freqs.dtype), self.freqs)
         freqs = repeat(freqs, '... n -> ... (n r)', r = 2)
 
         return freqs

@@ -38,9 +38,9 @@ def norm_coords(coords):
     min_x1 = coords[:, 0].min()
     min_y1 = coords[:, 1].min()
 
-    min_coords = torch.tensor([min_x1, min_y1])
-    max_coords = torch.tensor([max_x1, max_y1])
-    coords = (coords - min_coords) / max_coords
+    min_coords = torch.tensor([min_x1, min_y1], dtype=torch.float)
+    max_coords = torch.tensor([max_x1, max_y1], dtype=torch.float)
+    coords = (coords - min_coords) / (max_coords - min_coords)
     return coords
 
 def fps(points, n_samples):
@@ -106,6 +106,8 @@ def knn(coords, idx, k):
     # coords = np.array(coords, dtype=np.uint64)
     output = []
     coords = coords.long()
+    # print(idx)
+    # print(len(coords), 'ffff')
     for i in idx:
         # print(i)
         diff = []
@@ -121,8 +123,7 @@ def knn(coords, idx, k):
         # print((centroid - coords).shape)
 
         diff = ((centroid - coords) ** 2).sum(-1)
-        # print(diff)
-        indeces = torch.tensor(diff).topk(k=k, largest=False)[1]
+        indeces = torch.tensor(diff).topk(k=min(k, diff.shape[0]), largest=False)[1]
         indeces = indeces[1:]  # the nearest point is itself, remove it.
 
         # print(diff[indeces[0]])
@@ -136,44 +137,42 @@ def knn(coords, idx, k):
         if (i == output).sum() == 0:
             # print(i, output)
             remaining.append(i)
-    output = torch.cat([output, torch.tensor(remaining)])
+    output = torch.cat([output, torch.tensor(remaining, dtype=torch.long)])
 
     return output
 
 
-def draw_points(img_dir, h5_path, coords, color):
-    basename = os.path.basename(h5_path)
-    basename = basename.replace('h5', 'tif')
+# def draw_points(img_dir, h5_path, coords, color):
+#     basename = os.path.basename(h5_path)
+#     basename = basename.replace('h5', 'tif')
 
-    img_path = os.path.join(img_dir, basename)
+#     img_path = os.path.join(img_dir, basename)
 
-    wsi = openslide.OpenSlide(img_path)
+#     wsi = openslide.OpenSlide(img_path)
 
-    level = 5
-    dims = wsi.level_dimensions[level]
-    downsample_factor = wsi.level_downsamples[level]
+#     level = 5
+#     dims = wsi.level_dimensions[level]
+#     downsample_factor = wsi.level_downsamples[level]
 
-    # dims = dims / downsample_factor
-    img = wsi.read_region((0, 0), level, dims).convert('RGB')
-    img = np.array(img)
-    img = img[:, :, ::-1]
+#     # dims = dims / downsample_factor
+#     img = wsi.read_region((0, 0), level, dims).convert('RGB')
+#     img = np.array(img)
+#     img = img[:, :, ::-1]
 
-    # print(type(img), img[33, 3])
-    # print(img.shape, img.dtype)
-    cv2.imwrite('test.jpg', img)
-    img = cv2.imread('test.jpg')
-    for coord in coords:
-        coord = coord / downsample_factor
-        # print(type(coord))
-        coord = coord.tolist()
-        coord = [int(c) for c in coord]
-        # coord = [30, 30]
-        # img = np.zeros((400, 400, 3), np.uint8)
-        cv2.circle(img, coord, 3, color, 3)
+#     # print(type(img), img[33, 3])
+#     # print(img.shape, img.dtype)
+#     for coord in coords:
+#         coord = coord / downsample_factor
+#         # print(type(coord))
+#         coord = coord.tolist()
+#         coord = [int(c) for c in coord]
+#         # coord = [30, 30]
+#         # img = np.zeros((400, 400, 3), np.uint8)
+#         cv2.circle(img, coord, 3, color, 3)
 
-    # print(img.max())
-    # print(img.shape, img.dtype)
-    return img
+#     # print(img.max())
+#     # print(img.shape, img.dtype)
+#     return img
 
 def main():
 
@@ -185,9 +184,6 @@ def main():
     args = parser.parse_args()
 
     h5_dir = os.path.join(data_root, args.dataset, 'feat_clam_resnet50', 'patch_size_256_at_mag_20', 'h5_files')
-    # h5_dir = os.path.join(data_root, args.dataset, 'feat_clam_resnet50', 'patch_size_256_at_mag_20', 'h5_files')
-
-    img_dir = os.path.join(data_root, args.dataset, 'img')
 
     idx_path = os.path.join(data_root, args.dataset, 'idx_{}'.format(args.k))
     pos_path = os.path.join(data_root, args.dataset, 'pos')
@@ -196,34 +192,19 @@ def main():
     for h5_path in glob.iglob(os.path.join(h5_dir, '**', '*.h5'), recursive=True):
         coords = patch_coords(h5_path)
 
-        # img = draw_points(img_dir, h5_path, coords, (0, 0, 255))
-
         # coords = norm_coords(coords)
-        # idx = fps(coords, math.ceil(len(coords) / args.k))
-        # idx = knn(coords, idx, k=args.k)
+        idx = fps(coords, math.ceil(len(coords) / args.k))
+        idx = knn(coords, idx, k=args.k)
 
-        # print(idx.shape)
-        # img = draw_points(img_dir, h5_path, coords, (0, 0, 255))
-        # cv2.imwrite('test.jpg', img)
-
-        # import sys; sys.exit()
-
-        # torch.save()
-        # idx_file = os.path.join(idx_path, os.path.basename(h5_path).replace('.h5', '.pt'))
-        # torch.save(idx, idx_file)
-        # print(idx_file)
+        idx_file = os.path.join(idx_path, os.path.basename(h5_path).replace('.h5', '.pt'))
+        torch.save(idx, idx_file)
+        print(idx_file)
 
         coords = norm_coords(coords)
-        # print(coords[idx])
-        # coords = coords[idx]
-        # print(idx.shape)
-        # print(coords.shape)
-        # print(coords)
         pos_file = os.path.join(pos_path, os.path.basename(h5_path).replace('.h5', '.pt'))
         print(pos_file)
         torch.save(coords, pos_file)
 
 
-
-
-main()
+if __name__ == '__main__':
+    main()

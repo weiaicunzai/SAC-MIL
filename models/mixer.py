@@ -10,7 +10,7 @@ from torch import nn
 from torch.nn.modules.utils import _pair
 import torch.nn.functional as F
 
-from models.Pos import RotaryEmbedding
+from models.pos import RotaryEmbedding
 
 
 TOK_FC_0 = "token_mixing/Dense_0"
@@ -479,13 +479,13 @@ class Interaction(nn.Module):
 
         return res
 
-class Rope(nn.Module):
-    def __init__(self, dim):
-        super().__init__()
-        self.dim = dim
+# class Rope(nn.Module):
+#     def __init__(self, dim):
+#         super().__init__()
+#         self.dim = dim
 
-    def forward(self, len):
-        print(len)
+#     def forward(self, len):
+#         print(len)
 
 class MlpMixer(nn.Module):
     def __init__(self, input_dim, hidden_dim, num_classes=2):
@@ -717,7 +717,7 @@ class MlpMixer(nn.Module):
 
         x = self.fc1(x)
 
-        # x = self.pos_emb(x, pos)
+        x = self.pos_emb(x, pos)
 
         x = self.pad_k(x)
 
