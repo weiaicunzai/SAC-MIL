@@ -113,3 +113,7 @@ baseline1_intra_region_prenorm_res_connect_roll_unroll_inter_fc
 baseline1_intra_region_prenorm_res_connect_roll_unroll_inter_fc_relu
 baseline_1
 legacy
+test_cleaned_baseline
+tmp
+*.jpg
+add_pos
