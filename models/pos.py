@@ -2,19 +2,12 @@ from __future__ import annotations
 # from math import pi, log
 
 import torch
+import torch.nn as nn
 from torch.nn import Module
 from torch.cuda.amp import autocast
 from torch import einsum
 
 from einops import rearrange, repeat
-
-# from typing import Literal
-
-def exists(val):
-    return val is not None
-
-def default(val, d):
-    return val if exists(val) else d
 
 def rotate_half(x):
     x = rearrange(x, '... (d r) -> ... d r', r = 2)
@@ -40,16 +33,17 @@ class RotaryEmbedding(Module):
     def __init__(
         self,
         dim,
+        scale,
         theta = 10000,
     ):
         super().__init__()
 
         self.theta = theta
         self.dim = dim
+        assert self.dim % 4 == 0
         pos_dim = self.dim // 2
-        self.freqs = 1. / (self.theta ** (torch.arange(0, pos_dim, 2)[:(pos_dim // 2)].float() / pos_dim))
-        self.freqs = torch.nn.Parameter(self.freqs, requires_grad=False)
-
+        self.freqs = nn.Parameter(1. / (self.theta ** (torch.arange(0, pos_dim, 2)[:(pos_dim // 2)].float() / pos_dim)), requires_grad=False)
+        self.scale = scale
 
     @property
     def device(self):
@@ -57,6 +51,8 @@ class RotaryEmbedding(Module):
 
     @autocast(enabled = False)
     def forward(self, t, pos):
+        pos = self.scale * pos
+
         pos_x = pos[:, :, 0]
         pos_y = pos[:, :, 1]
 
@@ -74,25 +70,8 @@ class RotaryEmbedding(Module):
         pos,
     ):
 
-        # half pos
-        assert self.dim % 4 == 0
-        # pos_dim = self.dim // 2
-        # freqs = 1. / (self.theta ** (torch.arange(0, pos_dim, 2)[:(pos_dim // 2)].float() / pos_dim))
-
-        freqs = einsum('..., f -> ... f', pos.type(self.freqs.dtype), self.freqs)
+        freqs = self.freqs
+        freqs = einsum('..., f -> ... f', pos.type(freqs.dtype), freqs)
         freqs = repeat(freqs, '... n -> ... (n r)', r = 2)
 
         return freqs
-
-
-
-# ros = RotaryEmbedding(8)
-# # # print(ros)
-
-# inter = torch.randn(1, 5, 16)
-# pos = torch.rand(1, 5, 2) * 1024
-# a = ros.encode_pos(inter, pos)
-# a = ros(inter, pos)
-# # print(a.shape)
-# print(inter[0, 0])
-# print(a[0, 0])
