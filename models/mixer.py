@@ -61,11 +61,19 @@ class IntraRegionK(nn.Module):
         self.scale = int(self.k ** (math.log(self.region_size, self.k) - 1))
 
         self.inter_fc = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU()
+            nn.Linear(hidden_dim, hidden_dim // 4),
+            nn.ReLU(),
+            nn.Dropout(),
+            nn.Linear(hidden_dim // 4, hidden_dim),
+            nn.Dropout()
         )
+
         self.intra_fc = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim),
+            nn.Linear(hidden_dim, hidden_dim // 4),
+            nn.ReLU(),
+            nn.Dropout(),
+            nn.Linear(hidden_dim // 4, hidden_dim),
+            nn.Dropout(),
         )
 
         self.pre_norm = nn.LayerNorm(hidden_dim)
