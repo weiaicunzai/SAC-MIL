@@ -4,10 +4,6 @@ import torch
 import pandas as pd
 
 import torch.utils.data as data
-<<<<<<<< HEAD:datasets/wsi_dataset.py
-from torch.utils.data import dataloader
-========
->>>>>>>> c8e7a3c (ref: clean code):datasets/wsi_data.py
 
 
 class WSIDataset(data.Dataset):

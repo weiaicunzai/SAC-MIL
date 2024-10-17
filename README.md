@@ -1,4 +1,4 @@
-python train.py --stage='train'  --gpus=0 --fold=0
+# Mixer
 
 DATSET_NAME: support 3 dataset names, cam16, brac, lung
 
