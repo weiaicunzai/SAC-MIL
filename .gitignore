@@ -117,3 +117,8 @@ test_cleaned_baseline
 tmp
 *.jpg
 add_pos
+rotary-embedding-torch
+datasets
+rotary_embedding_torch/
+.vscode
+.vscode1

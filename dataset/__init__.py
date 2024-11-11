@@ -1,2 +1,2 @@
-from .wsi_data import WSIDataset
+from .wsi_dataset import WSIDataset
 from .data_interface import WSIDataModule

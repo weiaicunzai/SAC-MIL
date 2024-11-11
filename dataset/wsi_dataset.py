@@ -5,7 +5,6 @@ import pandas as pd
 
 import torch.utils.data as data
 
-
 class WSIDataset(data.Dataset):
     def __init__(self, data_root, state, fold):
         super().__init__()
@@ -79,12 +78,15 @@ class WSIDataset(data.Dataset):
         slide_id = self.slide_names[idx]
         label = self.wsis[slide_id]
         full_path = os.path.join(self.feat_dir, '{}.pt'.format(slide_id))
+        # print(full_path)
+
         features = torch.load(full_path)
 
-        idx = torch.load(os.path.join(self.idx, slide_id + '.pt')).long()
-        # features = features[idx]
 
+        idx = torch.load(os.path.join(self.idx, slide_id + '.pt')).long()
         pos = torch.load(os.path.join(self.pos, slide_id + '.pt'))
+
+        features = features[idx]
         pos = pos[idx]
 
         # print(full_path)

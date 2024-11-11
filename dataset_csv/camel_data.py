@@ -22,7 +22,7 @@ import lmdb
 from struct import unpack
 from torch.utils.data import default_collate
 
-from datasets.wsi import WSIJSON, WSIJSONLazyInitializer
+from dataset.wsi import WSIJSON, WSIJSONLazyInitializer
 
 
 

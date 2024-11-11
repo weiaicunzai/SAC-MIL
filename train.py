@@ -4,7 +4,7 @@ print(os.getcwd())
 sys.path.append(os.getcwd())
 import argparse
 
-from datasets import WSIDataModule
+from dataset import WSIDataModule
 from models import ModelInterface
 from utils.utils import *
 
