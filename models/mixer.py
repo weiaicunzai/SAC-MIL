@@ -20,15 +20,18 @@ class MlpMixer(nn.Module):
 
         self.k = 64
 
-        self.intra_region = nn.Sequential(
-            IntraRegionK(hidden_dim, self.k, self.k ** 1),
-            IntraRegionK(hidden_dim, self.k, self.k ** 2),
-            IntraRegionK(hidden_dim, self.k, self.k ** 3)
-        )
+        # self.intra_region = nn.Sequential(
+        #     IntraRegionK(hidden_dim, self.k, self.k ** 1),
+        #     IntraRegionK(hidden_dim, self.k, self.k ** 2),
+        #     IntraRegionK(hidden_dim, self.k, self.k ** 3)
+        # )
+        self.intra_region1 = IntraRegionK(hidden_dim, self.k, self.k ** 1) 
+        self.intra_region2 = IntraRegionK(hidden_dim, self.k, self.k ** 1) 
+        self.intra_region3 = IntraRegionK(hidden_dim, self.k, self.k ** 1) 
 
         self.fc2 = nn.Linear(hidden_dim, self.num_classes)
 
-        self.pos_emb = RotaryEmbedding(hidden_dim, scale=1)
+        # self.pos_emb = RotaryEmbedding(hidden_dim, scale=1)
 
     def forward(self, **kwargs):
 
@@ -38,10 +41,17 @@ class MlpMixer(nn.Module):
 
         x = self.fc1(x)
 
-        x = self.pos_emb(x, pos)
+        # x = self.pos_emb(x, pos)
+        
+        # pos = pos * 512 * 8
+        # print(pos)
 
+        # inputs = (x, pos)
 
-        x = self.intra_region(x)
+        # x = self.intra_region(x)
+        x = self.intra_region1(x, pos)
+        x = self.intra_region2(x, pos)
+        x = self.intra_region3(x, pos)
 
         x = x.mean(dim=-2)
 
@@ -61,33 +71,87 @@ class IntraRegionK(nn.Module):
         self.scale = int(self.k ** (math.log(self.region_size, self.k) - 1))
 
         self.inter_fc = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim // 4),
-            nn.ReLU(),
-            nn.Dropout(),
-            nn.Linear(hidden_dim // 4, hidden_dim),
-            nn.Dropout()
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU()
         )
-
         self.intra_fc = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim // 4),
+            nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
-            nn.Dropout(),
-            nn.Linear(hidden_dim // 4, hidden_dim),
-            nn.Dropout(),
+            nn.Linear(hidden_dim, 1),
         )
 
-        self.pre_norm = nn.LayerNorm(hidden_dim)
+        # self.out_fc = nn.Sequential(
+        #     nn.Linear(hidden_dim, hidden_dim),
+        # )
 
-    def forward(self, x):
+        # self.pre_norm = nn.LayerNorm(hidden_dim)
 
-        res = x
-        x = self.pre_norm(x)
+        self.norm1 = nn.LayerNorm(hidden_dim)
+        # self.norm2 = nn.LayerNorm(hidden_dim)
+
+        # x = self.norm1(x + res)
+        from rotary_embedding_torch.rotary_embedding_torch.rotary_embedding_torch_ori import RotaryEmbedding as ori_emb
+        self.pos_emb = ori_emb(hidden_dim)
+
+        self.hidden_dim = hidden_dim
+
+
+
+    # def mixer_attn(self, x, pos):
+    def mixer_attn(self, x, pos):
+        v = x
+        # print()
+        # print(x.shape[1])
+        # print('before', x.mean().item(), x.std().item(), x.max().item())
+        x = self.pos_emb.rotate_queries_or_keys(x, pos)
+        # print('after:', x.mean().item(), x.std().item(), x.max().item())
         x = self.roll_all(x)
         x = self.inter_fc(x)
         x = self.unroll_all(x)
         x = self.intra_fc(x)
+        # x = x.sum(dim=-1, keepdim=True)  / self.hidden_dim
 
-        x = x + res
+        # print(x.max())
+        # x = x.softmax(dim=1)
+        # print(x.max(), x.mean())
+        x = x.softmax(dim=1)
+        # print(x)
+        # print(x.max().item(), x.mean().item(), 'attn')
+        # print(x.max())
+        # print((v*x).sum(dim=1, keepdim=True).shape)
+
+        x = v + (x * v).sum(dim=1)
+        # x = v + x
+
+        # print('after:', x.mean().item(), x.std().item(), x.max().item())
+
+        return x
+
+
+    def forward(self, x, pos):
+
+        # res = x
+        # x = self.pre_norm(x)
+
+        res = x
+        #x = self.mixer_attn(x, pos)
+        x = self.mixer_attn(x, pos)
+
+        # x = res + x
+        x = self.norm1(x + res)
+        # x = self.roll_all(x)
+        # x = self.inter_fc(x)
+        # x = self.unroll_all(x)
+        # x = self.intra_fc(x)
+
+        # x = self.out_fc(x)
+
+        # x = self.norm2(x + res)
+
+
+        # x = self.norm2(x)
+
+        # x = x + res
 
         return x
 
@@ -181,31 +245,3 @@ class IntraRegionK(nn.Module):
             res = res.view(B, L, D)
 
         return res
-
-
-# net = IntraRegionK(512, 64)
-
-# inputs = torch.randn(1, 100, 512)
-
-# out = net(inputs)
-
-# net = IntraRegionK(513, 64)
-
-# inputs = torch.randn(1, 100, 512)
-
-# out = net(inputs)
-
-# k = 4
-# dim = 8
-# len = 33
-
-# torch.set_printoptions(linewidth=200)
-# net = IntraRegionK(dim,  k, k ** 3)
-
-# a = [torch.arange(len) for i in range(dim)]
-# a = torch.stack(a, dim=-1).unsqueeze(dim=0)
-# inputs = a
-# out = net(inputs)
-# print(net.region_size)
-# print(net.k)
-# print(net.scale)
