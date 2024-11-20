@@ -25,9 +25,9 @@ class MlpMixer(nn.Module):
         #     IntraRegionK(hidden_dim, self.k, self.k ** 2),
         #     IntraRegionK(hidden_dim, self.k, self.k ** 3)
         # )
-        self.intra_region1 = IntraRegionK(hidden_dim, self.k, self.k ** 1) 
-        self.intra_region2 = IntraRegionK(hidden_dim, self.k, self.k ** 1) 
-        self.intra_region3 = IntraRegionK(hidden_dim, self.k, self.k ** 1) 
+        self.intra_region1 = IntraRegionK(hidden_dim, self.k, self.k ** 1, use_pos=True) 
+        self.intra_region2 = IntraRegionK(hidden_dim, self.k, self.k ** 1, use_pos=False) 
+        self.intra_region3 = IntraRegionK(hidden_dim, self.k, self.k ** 1, use_pos=False) 
 
         self.fc2 = nn.Linear(hidden_dim, self.num_classes)
 
@@ -63,7 +63,7 @@ class MlpMixer(nn.Module):
         return results_dict
 
 class IntraRegionK(nn.Module):
-    def __init__(self, hidden_dim, k, region_size):
+    def __init__(self, hidden_dim, k, region_size, use_pos):
         super().__init__()
 
         self.k = k
@@ -74,6 +74,7 @@ class IntraRegionK(nn.Module):
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU()
         )
+
         self.intra_fc = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
@@ -90,8 +91,11 @@ class IntraRegionK(nn.Module):
         # self.norm2 = nn.LayerNorm(hidden_dim)
 
         # x = self.norm1(x + res)
-        from rotary_embedding_torch.rotary_embedding_torch.rotary_embedding_torch_ori import RotaryEmbedding as ori_emb
-        self.pos_emb = ori_emb(hidden_dim)
+        self.use_pos = use_pos
+        print('use_pos: ', self.use_pos)
+        if self.use_pos is True:
+            from rotary_embedding_torch.rotary_embedding_torch.rotary_embedding_torch_ori import RotaryEmbedding as ori_emb
+            self.pos_emb = ori_emb(hidden_dim)
 
         self.hidden_dim = hidden_dim
 
@@ -99,32 +103,45 @@ class IntraRegionK(nn.Module):
 
     # def mixer_attn(self, x, pos):
     def mixer_attn(self, x, pos):
-        v = x
-        # print()
-        # print(x.shape[1])
-        # print('before', x.mean().item(), x.std().item(), x.max().item())
-        x = self.pos_emb.rotate_queries_or_keys(x, pos)
-        # print('after:', x.mean().item(), x.std().item(), x.max().item())
+        res = x
+        x = self.norm1(x)
+
+        if self.use_pos:
+            print('before', x.mean(), x.std())
+            x = self.pos_emb.rotate_queries_or_keys(x, pos)
+
         x = self.roll_all(x)
         x = self.inter_fc(x)
         x = self.unroll_all(x)
         x = self.intra_fc(x)
-        # x = x.sum(dim=-1, keepdim=True)  / self.hidden_dim
 
-        # print(x.max())
-        # x = x.softmax(dim=1)
-        # print(x.max(), x.mean())
-        x = x.softmax(dim=1)
-        # print(x)
-        # print(x.max().item(), x.mean().item(), 'attn')
-        # print(x.max())
-        # print((v*x).sum(dim=1, keepdim=True).shape)
+        if self.use_pos:
+            # x = x.softmax(dim=1)
 
-        x = v + (x * v).sum(dim=1)
-        # x = v + x
 
-        # print('after:', x.mean().item(), x.std().item(), x.max().item())
+            # 87+
+            x = (x * res).sum(dim=1, keepdim=True)
 
+            # x = x * res
+
+
+            # not ganna work
+            # x = x.mean(dim=1, keepdim=True)
+
+            # 
+            # sum
+            # x = (x * res).sum(dim=1, keepdim=True)
+
+            # mean
+            # x = (x * res).mean(dim=1, keepdim=True)
+
+            # x = res + x
+        # else:
+            # x = res + x
+
+        # print(x.mean().item(), x.std().item())
+
+        x = res + x
         return x
 
 
@@ -133,12 +150,12 @@ class IntraRegionK(nn.Module):
         # res = x
         # x = self.pre_norm(x)
 
-        res = x
+        # res = x
         #x = self.mixer_attn(x, pos)
         x = self.mixer_attn(x, pos)
 
         # x = res + x
-        x = self.norm1(x + res)
+        # x = self.norm1(x + res)
         # x = self.roll_all(x)
         # x = self.inter_fc(x)
         # x = self.unroll_all(x)
