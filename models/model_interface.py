@@ -39,19 +39,14 @@ class  ModelInterface(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         #---->inference
-        # data, label, slide_id = batch
         data, pos, label = batch
 
         results_dict = self.model(data=data, pos=pos, label=label)
 
         logits = results_dict['logits']
 
-
         loss = self.loss(logits, label)
 
-
-        # tmp = list(self.model.fc1[0].parameters())[0]
-        # print(tmp)
         return {'loss': loss}
 
     def on_train_epoch_end(self):
@@ -59,7 +54,6 @@ class  ModelInterface(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         data, pos, label = batch
-        # print('val_slide', slide_id, label)
 
         with torch.no_grad():
             results_dict = self.model(data=data, pos=pos, label=label)
@@ -76,14 +70,10 @@ class  ModelInterface(pl.LightningModule):
 
         res = self.valid_metrics.compute()
 
-
         self.log('val_acc', res['val_MulticlassAccuracy'])
 
-
-        # self.val_probs = {}
         if self.best_acc is None:
             self.best_acc = res
-
         else:
             if self.best_acc['val_MulticlassAccuracy'] < res['val_MulticlassAccuracy']:
                 self.best_acc = res
@@ -106,7 +96,7 @@ class  ModelInterface(pl.LightningModule):
 
     def load_model(self, model):
         if model.lower() == 'transmil':
-            from models.TransMIL import TransMIL
+            from models.transmil import TransMIL
             model = TransMIL(2)
 
         elif model.lower() == 'mixer':

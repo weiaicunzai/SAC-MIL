@@ -75,22 +75,21 @@ class IntraRegionK(nn.Module):
             nn.ReLU()
         )
 
-        self.intra_fc = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, 1),
-        )
+        if use_pos:
+            self.intra_fc = nn.Sequential(
+                    nn.Linear(hidden_dim, hidden_dim),
+                    nn.ReLU(),
+                    nn.Linear(hidden_dim, 1),
+                )
+        else:
+            self.intra_fc = nn.Sequential(
+                nn.Linear(hidden_dim, hidden_dim),
+            )
 
-        # self.out_fc = nn.Sequential(
-        #     nn.Linear(hidden_dim, hidden_dim),
-        # )
-
-        # self.pre_norm = nn.LayerNorm(hidden_dim)
+        print(self.intra_fc)
 
         self.norm1 = nn.LayerNorm(hidden_dim)
-        # self.norm2 = nn.LayerNorm(hidden_dim)
 
-        # x = self.norm1(x + res)
         self.use_pos = use_pos
         print('use_pos: ', self.use_pos)
         if self.use_pos is True:
@@ -100,14 +99,11 @@ class IntraRegionK(nn.Module):
         self.hidden_dim = hidden_dim
 
 
-
-    # def mixer_attn(self, x, pos):
     def mixer_attn(self, x, pos):
         res = x
         x = self.norm1(x)
 
         if self.use_pos:
-            print('before', x.mean(), x.std())
             x = self.pos_emb.rotate_queries_or_keys(x, pos)
 
         x = self.roll_all(x)
@@ -117,29 +113,8 @@ class IntraRegionK(nn.Module):
 
         if self.use_pos:
             # x = x.softmax(dim=1)
-
-
             # 87+
             x = (x * res).sum(dim=1, keepdim=True)
-
-            # x = x * res
-
-
-            # not ganna work
-            # x = x.mean(dim=1, keepdim=True)
-
-            # 
-            # sum
-            # x = (x * res).sum(dim=1, keepdim=True)
-
-            # mean
-            # x = (x * res).mean(dim=1, keepdim=True)
-
-            # x = res + x
-        # else:
-            # x = res + x
-
-        # print(x.mean().item(), x.std().item())
 
         x = res + x
         return x
