@@ -21,6 +21,7 @@ def make_parse():
     parser.add_argument('--fold', default = 0)
     parser.add_argument('--dataset', type=str, required=True)
     parser.add_argument('--model', type=str, required=True, default='mixer')
+    parser.add_argument('--ckpt', type=str)
     args = parser.parse_args()
     return args
 
@@ -59,12 +60,12 @@ def main(args):
     if args.stage == 'train':
         trainer.fit(model = model, datamodule = dm)
     else:
-        model_paths = list(cfg.log_path.glob('*.ckpt'))
-        model_paths = [str(model_path) for model_path in model_paths if 'epoch' in str(model_path)]
-        for path in model_paths:
-            print(path)
-            new_model = model.load_from_checkpoint(checkpoint_path=path, cfg=cfg)
-            trainer.test(model=new_model, datamodule=dm)
+        # model_paths = list(cfg.log_path.glob('*.ckpt'))
+        # model_paths = [str(model_path) for model_path in model_paths if 'epoch' in str(model_path)]
+        # for path in model_paths:
+        #     print(path)
+        new_model = ModelInterface.load_from_checkpoint(args.ckpt)
+        trainer.test(model=new_model, datamodule=dm)
 
 if __name__ == '__main__':
 
