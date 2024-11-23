@@ -46,10 +46,10 @@ def load_callbacks(ckpt_root, dataset_name, fold):
 
     Mycallbacks.append(ModelCheckpoint(monitor = 'val_acc',
                                          dirpath = ckpt_path,
-                                         filename = '{epoch:02d}-{val_loss:.4f}',
+                                         filename = '{epoch:02d}-{val_acc:.4f}',
                                          verbose = True,
                                          save_last = True,
                                          save_top_k = 1,
-                                         mode = 'min',
+                                         mode = 'max',
                                          save_weights_only = True))
     return Mycallbacks
