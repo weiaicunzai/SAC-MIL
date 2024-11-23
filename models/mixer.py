@@ -93,8 +93,9 @@ class IntraRegionK(nn.Module):
         self.use_pos = use_pos
         print('use_pos: ', self.use_pos)
         if self.use_pos is True:
-            from rotary_embedding_torch.rotary_embedding_torch.rotary_embedding_torch_ori import RotaryEmbedding as ori_emb
-            self.pos_emb = ori_emb(hidden_dim)
+            # from rotary_embedding_torch.rotary_embedding_torch.rotary_embedding_torch_ori import RotaryEmbedding as ori_emb
+            from models.pos import RotaryEmbedding as pos_emb
+            self.pos_emb = pos_emb(hidden_dim)
 
         self.hidden_dim = hidden_dim
 
