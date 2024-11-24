@@ -71,19 +71,25 @@ class IntraRegionK(nn.Module):
         self.scale = int(self.k ** (math.log(self.region_size, self.k) - 1))
 
         self.inter_fc = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU()
+            nn.Linear(hidden_dim, int(hidden_dim)),
+            nn.ReLU(),
+            # nn.Linear(int(hidden_dim / 4), hidden_dim),
+            # nn.ReLU()
         )
 
         if use_pos:
             self.intra_fc = nn.Sequential(
-                    nn.Linear(hidden_dim, hidden_dim),
+                    nn.Linear(hidden_dim, int(hidden_dim)),
                     nn.ReLU(),
-                    nn.Linear(hidden_dim, 1),
+                    nn.Linear(int(hidden_dim), 1),
+                    # nn.ReLU(),
                 )
         else:
             self.intra_fc = nn.Sequential(
-                nn.Linear(hidden_dim, hidden_dim),
+                nn.Linear(hidden_dim, int(hidden_dim)),
+                # nn.ReLU(),
+                # nn.Linear(int(hidden_dim  / 4), self.hidden_dim),
+                # nn.ReLU(),
             )
 
         print(self.intra_fc)
