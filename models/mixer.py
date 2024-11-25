@@ -20,18 +20,11 @@ class MlpMixer(nn.Module):
 
         self.k = 64
 
-        # self.intra_region = nn.Sequential(
-        #     IntraRegionK(hidden_dim, self.k, self.k ** 1),
-        #     IntraRegionK(hidden_dim, self.k, self.k ** 2),
-        #     IntraRegionK(hidden_dim, self.k, self.k ** 3)
-        # )
         self.intra_region1 = IntraRegionK(hidden_dim, self.k, self.k ** 1, use_pos=True) 
         self.intra_region2 = IntraRegionK(hidden_dim, self.k, self.k ** 1, use_pos=False) 
         self.intra_region3 = IntraRegionK(hidden_dim, self.k, self.k ** 1, use_pos=False) 
 
         self.fc2 = nn.Linear(hidden_dim, self.num_classes)
-
-        # self.pos_emb = RotaryEmbedding(hidden_dim, scale=1)
 
     def forward(self, **kwargs):
 
@@ -41,14 +34,6 @@ class MlpMixer(nn.Module):
 
         x = self.fc1(x)
 
-        # x = self.pos_emb(x, pos)
-        
-        # pos = pos * 512 * 8
-        # print(pos)
-
-        # inputs = (x, pos)
-
-        # x = self.intra_region(x)
         x = self.intra_region1(x, pos)
         x = self.intra_region2(x, pos)
         x = self.intra_region3(x, pos)
@@ -71,25 +56,19 @@ class IntraRegionK(nn.Module):
         self.scale = int(self.k ** (math.log(self.region_size, self.k) - 1))
 
         self.inter_fc = nn.Sequential(
-            nn.Linear(hidden_dim, int(hidden_dim)),
+            nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
-            # nn.Linear(int(hidden_dim / 4), hidden_dim),
-            # nn.ReLU()
         )
 
         if use_pos:
             self.intra_fc = nn.Sequential(
-                    nn.Linear(hidden_dim, int(hidden_dim)),
+                    nn.Linear(hidden_dim, hidden_dim),
                     nn.ReLU(),
-                    nn.Linear(int(hidden_dim), 1),
-                    # nn.ReLU(),
+                    nn.Linear(hidden_dim, 1),
                 )
         else:
             self.intra_fc = nn.Sequential(
-                nn.Linear(hidden_dim, int(hidden_dim)),
-                # nn.ReLU(),
-                # nn.Linear(int(hidden_dim  / 4), self.hidden_dim),
-                # nn.ReLU(),
+                nn.Linear(hidden_dim, hidden_dim),
             )
 
         print(self.intra_fc)
@@ -99,7 +78,6 @@ class IntraRegionK(nn.Module):
         self.use_pos = use_pos
         print('use_pos: ', self.use_pos)
         if self.use_pos is True:
-            # from rotary_embedding_torch.rotary_embedding_torch.rotary_embedding_torch_ori import RotaryEmbedding as ori_emb
             from models.pos import RotaryEmbedding as pos_emb
             self.pos_emb = pos_emb(hidden_dim)
 
@@ -129,28 +107,9 @@ class IntraRegionK(nn.Module):
 
     def forward(self, x, pos):
 
-        # res = x
-        # x = self.pre_norm(x)
 
-        # res = x
-        #x = self.mixer_attn(x, pos)
         x = self.mixer_attn(x, pos)
 
-        # x = res + x
-        # x = self.norm1(x + res)
-        # x = self.roll_all(x)
-        # x = self.inter_fc(x)
-        # x = self.unroll_all(x)
-        # x = self.intra_fc(x)
-
-        # x = self.out_fc(x)
-
-        # x = self.norm2(x + res)
-
-
-        # x = self.norm2(x)
-
-        # x = x + res
 
         return x
 

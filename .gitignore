@@ -200,3 +200,9 @@ transformer_base+softmaxsum
 transformer_base+softmaxsum_oursrope
 transformer_base+softmaxsum_rope
 wrope
+inter_fc
+inter_fc_replace_one_layer_with_two_layer
+intra_fc
+intra_fc_rm_last_relu
+intra_fc_rm_last_relu_three_layer
+test_ori
