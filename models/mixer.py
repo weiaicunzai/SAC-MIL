@@ -21,8 +21,8 @@ class MlpMixer(nn.Module):
         self.k = 64
 
         self.intra_region1 = IntraRegionK(hidden_dim, self.k, self.k ** 1, use_pos=True) 
-        self.intra_region2 = IntraRegionK(hidden_dim, self.k, self.k ** 1, use_pos=False) 
-        self.intra_region3 = IntraRegionK(hidden_dim, self.k, self.k ** 1, use_pos=False) 
+        self.intra_region2 = IntraRegionK(hidden_dim, self.k, self.k ** 2, use_pos=False) 
+        self.intra_region3 = IntraRegionK(hidden_dim, self.k, self.k ** 3, use_pos=False) 
 
         self.fc2 = nn.Linear(hidden_dim, self.num_classes)
 
