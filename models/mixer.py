@@ -53,7 +53,10 @@ class IntraRegionK(nn.Module):
 
         self.k = k
         self.region_size = region_size
-        self.scale = int(self.k ** (math.log(self.region_size, self.k) - 1))
+        layer_idx = math.log(self.region_size, self.k) - 1
+        self.scale = int(self.k ** layer_idx)
+        # self.scale = int(self.k ** (math.log(self.region_size, self.k) - 1))
+        # assert self.scale == int(self.k ** (math.log(self.region_size, self.k) - 1))
 
         self.inter_fc = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
