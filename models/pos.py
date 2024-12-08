@@ -67,9 +67,9 @@ def apply_rotary_emb(
     t_middle = t[..., start_index:end_index]
     t_right = t[..., end_index:]
 
-    # Apply rotary embeddings without modifying t in place    
+    # Apply rotary embeddings without modifying t in place
     t_transformed = (t_middle * freqs.cos() * scale) + (rotate_half(t_middle) * freqs.sin() * scale)
-        
+
     out = torch.cat((t_left, t_transformed, t_right), dim=-1)
 
     return out.type(dtype)
@@ -188,10 +188,12 @@ class RotaryEmbedding(Module):
         device, dtype, seq_len = t.device, t.dtype, t.shape[seq_dim]
 
         radius = self.compute_radius(pos)
-# 
+#
         theta = self.compute_theta(pos)
 
-        scale = 8196 * 4
+        scale = 512
+
+    # scale = 8196 * 4
         radius = radius / sqrt(2) * scale
         assert radius.max() <= scale
         freqs = self.forward(radius, seq_len = seq_len, offset = offset)

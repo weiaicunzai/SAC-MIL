@@ -54,6 +54,7 @@ def main(args):
         devices=[int(args.gpus)],
         precision='16-mixed',
         check_val_every_n_epoch=1,
+        enable_progress_bar=False,
     )
 
     #---->train or test
