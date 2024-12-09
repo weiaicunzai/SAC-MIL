@@ -229,7 +229,7 @@ class RotaryEmbedding(Module):
     ):
         angles = self.rotate_angle(pos)
 
-        # angles = angles % pi
+        angles = angles % pi
 
 
         return apply_rotary_emb(angles, x, scale = 1, seq_dim = -2)
