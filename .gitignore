@@ -206,3 +206,15 @@ intra_fc
 intra_fc_rm_last_relu
 intra_fc_rm_last_relu_three_layer
 test_ori
+add_layernom_afterfc1
+add_layernom_afterfc1_2pi
+debug
+haha_32784
+haha_512
+modpi_3w+
+modpi_512
+runs/
+steps_fix
+test.pt
+test_new
+train1.py
