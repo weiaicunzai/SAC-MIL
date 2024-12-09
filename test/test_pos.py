@@ -8,7 +8,7 @@ from einops import rearrange, repeat
 
 
 import torch
-from rotary_embedding_torch.rotary_embedding_torch import RotaryEmbedding as RoPE
+# from rotary_embedding_torch.rotary_embedding_torch import RotaryEmbedding as RoPE
 from dataset.wsi_dataset import WSIDataset
 from models.pos import RotaryEmbedding as MyRoPE
 import matplotlib.pyplot as plt
@@ -29,9 +29,9 @@ if __name__ == '__main__':
     train_dataset = WSIDataset(data_root, state='train', fold=0)
     # print(train_dataset)
 
-    rotary_emb = RoPE(dim=1024)
+    # rotary_emb = RoPE(dim=1024)
 
-    my_rotary = MyRoPE(dim=1024, scale=1)
+    my_rotary = MyRoPE(dim=512, scale=1)
 
 
 
@@ -46,107 +46,120 @@ if __name__ == '__main__':
     freqs = 1. / (theta ** (torch.arange(0, dim, 2)[:(dim // 2)].float() / dim))
 
     freqs = freqs.unsqueeze(dim=0)
+    print(freqs.shape)
 
-    angles = torch.tensor([])
-    angles = []
-    count = 0
-    for feat, pos, label in train_dataset:
+    # angles = torch.tensor([])
+    # angles = []
+    # count = 0
+    # scale = 512 * 4 * 4
+    # scale = 2048 * 8 * 2
+    scale = 512
 
-        count +=1
-        if count > 20:
-            break
+    for start_idx in range(0, 401, 100):
+        # print(start_idx)
 
-        feat = feat.unsqueeze(dim=0)
-        pos = pos.unsqueeze(dim=0)
+    # import sys;sys.exit()
+        angles = []
+        count = 0
+        for feat, pos, label in train_dataset:
 
-        radius = compute_distance(pos)
-        theta = compute_theta(pos)
-        # angle = diff * theta
-        # angle.append(angle)
-        # print(angle.shape)
-        # angles = torch.cat([angles, angle], dim=-1)
-        # print(angles.shape)
-        # continue
-        # radius.unsqueeze(dim=-1) * freqs.unsq
-        radius = radius / math.sqrt(2) * 1024 * 4
-        print(radius.unsqueeze(dim=-1).shape, freqs.unsqueeze(dim=0).shape )
-        angle = torch.einsum('bji,bik->bjk', radius.unsqueeze(dim=-1), freqs.unsqueeze(dim=0))
-        # result = torch.einsum('ijk,ijk->ij', , B)
-        # print(radius, radius.shape)
-        # print(angle.shape)
-        # print(angle)
-        # angles.append(freqs.view(-1))
-        # angles.append(radius.view(-1))
-        # angles.append(freqs.view(-1))
-        angles.append(angle[:, :, 500].view(-1))
+            count +=1
+            if count > 100:
+                break
 
-        # for i in freqs.view(-1):
-        #     print(i.item())
+            feat = feat.unsqueeze(dim=0)
+            pos = pos.unsqueeze(dim=0)
+
+            radius = compute_distance(pos)
+            theta = compute_theta(pos)
+            # angle = diff * theta
+            # angle.append(angle)
+            # print(angle.shape)
+            # angles = torch.cat([angles, angle], dim=-1)
+            # print(angles.shape)
+            # continue
+            # radius.unsqueeze(dim=-1) * freqs.unsq
+            radius = radius / math.sqrt(2) * scale
+            # print(radius.unsqueeze(dim=-1).shape, freqs.unsqueeze(dim=0).shape )
+            angle = torch.einsum('bji,bik->bjk', radius.unsqueeze(dim=-1), freqs.unsqueeze(dim=0))  + theta.unsqueeze(dim=-1)
+            # result = torch.einsum('ijk,ijk->ij', , B)
+            # print(radius, radius.shape)
+            # print(angle.shape)
+
+            # angles.append(angle[:, :, start_idx: start_idx + 100].reshape(-1))
+            angles.append(angle[:, :, :].reshape(-1))
+            print(count, start_idx, start_idx + 100)
+
+            # for i in freqs.view(-1):
+            #     print(i.item())
+
+            # import sys; sys.exit()
+            # break
+
+        # print(angles)
+
+
+        import pandas as pd
+        import numpy as np
+        import matplotlib.pyplot as plt
+
+        # 假设 data 是一个包含上亿个浮点数的数组
+        # data = np.random.randn(100000000)
+
+        mode = math.pi 
+        data = torch.cat(angles) % (mode)
+
+
+        # x = np.arange(len(data))
+
+        # print(x.shape)
+
+        # # 绘制点
+        # plt.scatter(x, data, color='blue', marker='o')
+
+        # # 设置图表标题和标签
+        # plt.title('Scatter Plot of One-Dimensional Array')
+        # plt.xlabel('Index')
+        # plt.ylabel('Value')
+        # plt.grid(True)
+        # plt.savefig('test1.jpg')
+        print(len(angles))
 
         # import sys; sys.exit()
-        # break
+        # 转换为 Pandas Series
+        series = pd.Series(data)
+        # series = pd.Series(data)
 
-    # print(angles)
-
-
-    import pandas as pd
-    import numpy as np
-    import matplotlib.pyplot as plt
-
-    # 假设 data 是一个包含上亿个浮点数的数组
-    # data = np.random.randn(100000000)
-
-    data = torch.cat(angles) % (math.pi * 2)
-
-
-    # x = np.arange(len(data))
-
-    # print(x.shape)
-
-    # # 绘制点
-    # plt.scatter(x, data, color='blue', marker='o')
-
-    # # 设置图表标题和标签
-    # plt.title('Scatter Plot of One-Dimensional Array')
-    # plt.xlabel('Index')
-    # plt.ylabel('Value')
-    # plt.grid(True)
-    # plt.savefig('test1.jpg')
-
-    # import sys; sys.exit()
-    # 转换为 Pandas Series
-    series = pd.Series(data)
-    # series = pd.Series(data)
-
-    # 绘制直方图
-    series.plot.hist(bins=100, range=(0, 2 * math.pi), color='blue', alpha=0.7, edgecolor='black')
-    plt.title('Frequency Distribution of Float Numbers')
-    plt.xlabel('Value')
-    plt.ylabel('Density')
-    plt.grid(True)
-    print('???')
-    # plt.show()
-    # plt.hist(data, bins=50,  density=False, color='blue', alpha=0.7, edgecolor='black')
-    # plt.title('Normalized Frequency Distribution of Float Numbers')
-    # plt.xlabel('Value')
-    # plt.ylabel('Density')
-    # plt.grid(True)
-    plt.savefig('test1.jpg')
-    # weight, density = torch.histogram(angles[0] / 2 * 3.14, density=False, bins=30)
-    # print(weight)
-    # print(density)
-    # print('????')
-    # plt.hist(angles[0] / 2 * 3.14, bins=30, color='skyblue', edgecolor='black')
-    # plt.xlabel('Values')
-    # plt.ylabel('Frequency')
-    # plt.title('Basic Histogram')
-    # # plt.savefig('', **kwargs)
-    # plt.savefig('simple_plot.jpg', dpi=300, bbox_inches='tight')
+        # 绘制直方图
+        series.plot.hist(bins=100, range=(0, mode), color='blue', alpha=0.7, edgecolor='black')
+        plt.title('Frequency Distribution of Float Numbers')
+        plt.xlabel('Theta')
+        plt.ylabel('Density')
+        plt.grid(True)
+        print('???')
+        # plt.show()
+        # plt.hist(data, bins=50,  density=False, color='blue', alpha=0.7, edgecolor='black')
+        # plt.title('Normalized Frequency Distribution of Float Numbers')
+        # plt.xlabel('Value')
+        # plt.ylabel('Density')
+        # plt.grid(True)
+        plt.savefig('test_11_{}_{}.jpg'.format(scale, start_idx))
+        plt.clf()
+        # weight, density = torch.histogram(angles[0] / 2 * 3.14, density=False, bins=30)
+        # print(weight)
+        # print(density)
+        # print('????')
+        # plt.hist(angles[0] / 2 * 3.14, bins=30, color='skyblue', edgecolor='black')
+        # plt.xlabel('Values')
+        # plt.ylabel('Frequency')
+        # plt.title('Basic Histogram')
+        # # plt.savefig('', **kwargs)
+        # plt.savefig('simple_plot.jpg', dpi=300, bbox_inches='tight')
 
 
 
 
-    import sys; sys.exit()
+        import sys; sys.exit()
 
 
         # print(feat.shape, pos.shape, label)
