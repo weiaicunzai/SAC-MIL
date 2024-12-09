@@ -9,20 +9,21 @@ from models.pos import RotaryEmbedding
 
 
 class MlpMixer(nn.Module):
-    def __init__(self, input_dim, hidden_dim, num_classes=2):
+    def __init__(self, input_dim, hidden_dim, scale, num_classes=2):
         super().__init__()
         self.num_classes = num_classes
 
         self.fc1 = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
+            nn.LayerNorm(hidden_dim),
             nn.ReLU()
         )
 
         self.k = 64
 
-        self.intra_region1 = IntraRegionK(hidden_dim, self.k, self.k ** 1, use_pos=True) 
-        self.intra_region2 = IntraRegionK(hidden_dim, self.k, self.k ** 2, use_pos=False) 
-        self.intra_region3 = IntraRegionK(hidden_dim, self.k, self.k ** 3, use_pos=False) 
+        self.intra_region1 = IntraRegionK(hidden_dim, self.k, self.k ** 1, use_pos=True, scale=scale) 
+        self.intra_region2 = IntraRegionK(hidden_dim, self.k, self.k ** 2, use_pos=False, scale=scale) 
+        self.intra_region3 = IntraRegionK(hidden_dim, self.k, self.k ** 3, use_pos=False, scale=scale) 
 
         self.fc2 = nn.Linear(hidden_dim, self.num_classes)
 
@@ -48,7 +49,7 @@ class MlpMixer(nn.Module):
         return results_dict
 
 class IntraRegionK(nn.Module):
-    def __init__(self, hidden_dim, k, region_size, use_pos):
+    def __init__(self, hidden_dim, k, region_size, use_pos, scale):
         super().__init__()
 
         self.k = k
@@ -82,7 +83,7 @@ class IntraRegionK(nn.Module):
         print('use_pos: ', self.use_pos)
         if self.use_pos is True:
             from models.pos import RotaryEmbedding as pos_emb
-            self.pos_emb = pos_emb(hidden_dim)
+            self.pos_emb = pos_emb(hidden_dim, scale=scale)
 
         self.hidden_dim = hidden_dim
 
@@ -92,7 +93,8 @@ class IntraRegionK(nn.Module):
         x = self.norm1(x)
 
         if self.use_pos:
-            x = self.pos_emb.rotate_queries_or_keys(x, pos)
+            # x = self.pos_emb.rotate_queries_or_keys(x, pos)
+            x = self.pos_emb(x, pos)
 
         x = self.roll_all(x)
         x = self.inter_fc(x)
