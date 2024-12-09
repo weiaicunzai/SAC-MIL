@@ -43,7 +43,7 @@ def main(args):
     dm = WSIDataModule(fold=args.fold, dataset_path=dataset_root)
 
     #---->Define Model
-    model = ModelInterface(model=args.model, debug=False)
+    model = ModelInterface(model=args.model, debug=True)
 
     #---->Instantiate Trainer
     trainer = Trainer(
