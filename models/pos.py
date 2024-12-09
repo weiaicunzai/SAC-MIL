@@ -96,13 +96,14 @@ class RotaryEmbedding(Module):
         max_freq = 10,
         num_freqs = 1,
         learned_freq = False,
-        use_xpos = False,
-        xpos_scale_base = 512,
+        # use_xpos = False,
+        # xpos_scale_base = 512,
         interpolate_factor = 1.,
         theta_rescale_factor = 1.,
-        seq_before_head_dim = False,
-        cache_if_possible = True,
-        cache_max_seq_len = 8192
+        # seq_before_head_dim = False,
+        # cache_if_possible = True,
+        # cache_max_seq_len = 8192,
+        scale=1
     ):
         super().__init__()
         # proposed by reddit user bloc97, to rescale rotary embeddings to longer sequence length without fine-tuning
@@ -122,79 +123,82 @@ class RotaryEmbedding(Module):
         elif freqs_for == 'constant':
             freqs = torch.ones(num_freqs).float()
 
-        self.cache_if_possible = cache_if_possible
-        self.cache_max_seq_len = cache_max_seq_len
+        # self.cache_if_possible = cache_if_possible
+        # self.cache_max_seq_len = cache_max_seq_len
 
-        self.register_buffer('cached_freqs', torch.zeros(cache_max_seq_len, dim), persistent = False)
-        self.register_buffer('cached_freqs_seq_len', torch.tensor(0), persistent = False)
+        # self.register_buffer('cached_freqs', torch.zeros(cache_max_seq_len, dim), persistent = False)
+        # self.register_buffer('cached_freqs_seq_len', torch.tensor(0), persistent = False)
 
         self.freqs = nn.Parameter(freqs, requires_grad = learned_freq)
 
-        self.learned_freq = learned_freq
+        # self.learned_freq = learned_freq
 
         # dummy for device
 
-        self.register_buffer('dummy', torch.tensor(0), persistent = False)
+        # self.register_buffer('dummy', torch.tensor(0), persistent = False)
 
         # default sequence dimension
 
-        self.seq_before_head_dim = seq_before_head_dim
-        self.default_seq_dim = -3 if seq_before_head_dim else -2
+        # self.seq_before_head_dim = seq_before_head_dim
+        # self.default_seq_dim = -3 if seq_before_head_dim else -2
 
         # interpolation factors
 
-        assert interpolate_factor >= 1.
-        self.interpolate_factor = interpolate_factor
+        # assert interpolate_factor >= 1.
+        # self.interpolate_factor = interpolate_factor
 
         # xpos
 
-        self.use_xpos = use_xpos
+        # self.use_xpos = use_xpos
 
-        if not use_xpos:
-            return
+        # if not use_xpos:
+            # return
 
-        scale = (torch.arange(0, dim, 2) + 0.4 * dim) / (1.4 * dim)
-        self.scale_base = xpos_scale_base
+        # scale = (torch.arange(0, dim, 2) + 0.4 * dim) / (1.4 * dim)
+        # self.scale_base = xpos_scale_base
 
-        self.register_buffer('scale', scale, persistent = False)
-        self.register_buffer('cached_scales', torch.zeros(cache_max_seq_len, dim), persistent = False)
-        self.register_buffer('cached_scales_seq_len', torch.tensor(0), persistent = False)
+        # self.register_buffer('scale', scale, persistent = False)
+        # self.register_buffer('cached_scales', torch.zeros(cache_max_seq_len, dim), persistent = False)
+        # self.register_buffer('cached_scales_seq_len', torch.tensor(0), persistent = False)
 
         # add apply_rotary_emb as static method
 
-        self.apply_rotary_emb = staticmethod(apply_rotary_emb)
+        # self.apply_rotary_emb = staticmethod(apply_rotary_emb)
+
+        self.scale = scale
 
     def compute_radius(self, pos):
-         diff = torch.norm(pos, p=2, dim=-1)
-         return diff
+        diff = torch.norm(pos, p=2, dim=-1)
+        diff = diff / sqrt(2) * self.scale
+        assert diff.max() <= self.scale
+        return diff
 
     def compute_theta(self, pos):
          theta = torch.atan2(pos[:, :, 0], pos[:, :, 1])
          return theta
 
-    @property
-    def device(self):
-        return self.dummy.device
+    # @property
+    # def device(self):
+    #     return self.dummy.device
 
-    def get_seq_pos(self, seq_len, device, dtype, offset = 0):
-        return (torch.arange(seq_len, device = device, dtype = dtype) + offset) / self.interpolate_factor
+    # def get_seq_pos(self, seq_len, device, dtype, offset = 0):
+    #     return (torch.arange(seq_len, device = device, dtype = dtype) + offset) / self.interpolate_factor
 
-    def rotate_queries_or_keys(self, t, pos, seq_dim = None, offset = 0, scale = None):
+    def rotate_queries_or_keys(self, t, pos, seq_dim = -2):
     # def rotate_queries_or_keys(self, t, seq_dim = None, offset = 0, scale = None):
-        seq_dim = default(seq_dim, self.default_seq_dim)
+        # seq_dim = default(seq_dim, self.default_seq_dim)
 
-        assert not self.use_xpos or exists(scale), 'you must use `.rotate_queries_and_keys` method instead and pass in both queries and keys, for length extrapolatable rotary embeddings'
+        # assert not self.use_xpos or exists(scale), 'you must use `.rotate_queries_and_keys` method instead and pass in both queries and keys, for length extrapolatable rotary embeddings'
 
-        device, dtype, seq_len = t.device, t.dtype, t.shape[seq_dim]
+        # device, dtype, seq_len = t.device, t.dtype, t.shape[seq_dim]
 
         radius = self.compute_radius(pos)
 # 
         theta = self.compute_theta(pos)
 
-        scale = 8196 * 4
-        radius = radius / sqrt(2) * scale
-        assert radius.max() <= scale
-        freqs = self.forward(radius, seq_len = seq_len, offset = offset)
+        # scale = 512
+        assert radius.max() <= self.scale
+        freqs = self.forward(radius)
         freqs = freqs + theta.unsqueeze(dim=-1)
 
         if seq_dim == -3:
@@ -203,31 +207,62 @@ class RotaryEmbedding(Module):
         #return apply_rotary_emb(freqs, t, scale = default(scale, 1.), seq_dim = seq_dim)
         return apply_rotary_emb(freqs, t, scale = 1, seq_dim = seq_dim)
 
-    @autocast('cuda', enabled = False)
-    def forward(
-        self,
-        t: Tensor,
-        seq_len = None,
-        offset = 0
-    ):
-        should_cache = (
-            self.cache_if_possible and
-            not self.learned_freq and
-            exists(seq_len) and
-            self.freqs_for != 'pixel' and
-            (offset + seq_len) <= self.cache_max_seq_len
-        )
-
-        if (
-            should_cache and \
-            exists(self.cached_freqs) and \
-            (offset + seq_len) <= self.cached_freqs_seq_len.item()
-        ):
-            return self.cached_freqs[offset:(offset + seq_len)].detach()
+    def rotate_angle(self, pos):
+        radius = self.compute_radius(pos)
+        theta = self.compute_theta(pos)
 
         freqs = self.freqs
 
-        freqs = einsum('..., f -> ... f', t.type(freqs.dtype), freqs)
+        freqs = einsum('..., f -> ... f', radius.type(freqs.dtype), freqs)
         freqs = repeat(freqs, '... n -> ... (n r)', r = 2)
 
-        return freqs
+        angles = freqs + theta.unsqueeze(dim=-1)
+
+        return angles
+
+
+    @autocast('cuda', enabled = False)
+    def forward(
+        self,
+        x,
+        pos,
+    ):
+        angles = self.rotate_angle(pos)
+
+        # angles = angles % pi
+
+
+        return apply_rotary_emb(angles, x, scale = 1, seq_dim = -2)
+
+
+
+
+
+    # @autocast('cuda', enabled = False)
+    # def forward(
+    #     self,
+    #     t: Tensor,
+    #     # seq_len = None,
+    #     # offset = 0
+    # ):
+    #     # should_cache = (
+    #     #     self.cache_if_possible and
+    #     #     not self.learned_freq and
+    #     #     exists(seq_len) and
+    #     #     self.freqs_for != 'pixel' and
+    #     #     (offset + seq_len) <= self.cache_max_seq_len
+    #     # )
+
+    #     # if (
+    #     #     should_cache and \
+    #     #     exists(self.cached_freqs) and \
+    #     #     (offset + seq_len) <= self.cached_freqs_seq_len.item()
+    #     # ):
+    #     #     return self.cached_freqs[offset:(offset + seq_len)].detach()
+
+    #     freqs = self.freqs
+
+    #     freqs = einsum('..., f -> ... f', t.type(freqs.dtype), freqs)
+    #     freqs = repeat(freqs, '... n -> ... (n r)', r = 2)
+
+    #     return freqs
