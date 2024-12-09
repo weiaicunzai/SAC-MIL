@@ -130,8 +130,8 @@ class  ModelInterface(pl.LightningModule):
 
         elif model.lower() == 'mixer':
             from models.mixer import MlpMixer
-            # model = MlpMixer(input_dim=1024, hidden_dim=512, scale=32768)
-            model = MlpMixer(input_dim=1024, hidden_dim=512, scale=512)
+            model = MlpMixer(input_dim=1024, hidden_dim=512, scale=32768)
+            # model = MlpMixer(input_dim=1024, hidden_dim=512, scale=512)
 
         else:
             raise ValueError("wrong model name")
