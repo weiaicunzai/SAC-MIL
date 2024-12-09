@@ -30,9 +30,9 @@ def load_loggers(log_root, dataset_name, fold):
                                              log_graph = True, default_hp_metric = False)
     print(hasattr(tb_logger, 'experiments'))
     #---->CSV
-    csv_logger = pl_loggers.CSVLogger(log_path)
+    # csv_logger = pl_loggers.CSVLogger(log_path)
 
-    return [tb_logger, csv_logger]
+    return [tb_logger]
 
 
 #---->load Callback

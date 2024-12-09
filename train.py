@@ -43,14 +43,14 @@ def main(args):
     dm = WSIDataModule(fold=args.fold, dataset_path=dataset_root)
 
     #---->Define Model
-    model = ModelInterface(model=args.model)
+    model = ModelInterface(model=args.model, debug=False)
 
     #---->Instantiate Trainer
     trainer = Trainer(
         num_sanity_val_steps=0,
         logger=loggers,
         callbacks=callbacks,
-        max_epochs= 200,
+        max_epochs=200,
         devices=[int(args.gpus)],
         precision='16-mixed',
         check_val_every_n_epoch=1,
