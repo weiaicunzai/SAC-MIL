@@ -98,12 +98,12 @@ class RotaryEmbedding(Module):
         learned_freq = False,
         # use_xpos = False,
         # xpos_scale_base = 512,
-        interpolate_factor = 1.,
         theta_rescale_factor = 1.,
         # seq_before_head_dim = False,
         # cache_if_possible = True,
         # cache_max_seq_len = 8192,
-        scale=1
+        scale=1,
+        mod=pi
     ):
         super().__init__()
         # proposed by reddit user bloc97, to rescale rotary embeddings to longer sequence length without fine-tuning
@@ -166,6 +166,8 @@ class RotaryEmbedding(Module):
         # self.apply_rotary_emb = staticmethod(apply_rotary_emb)
 
         self.scale = scale
+        self.mod = mod
+        print('mod: ', mod)
 
     def compute_radius(self, pos):
         diff = torch.norm(pos, p=2, dim=-1)
@@ -229,7 +231,7 @@ class RotaryEmbedding(Module):
     ):
         angles = self.rotate_angle(pos)
 
-        angles = angles % pi
+        angles = angles % self.mod
 
 
         return apply_rotary_emb(angles, x, scale = 1, seq_dim = -2)
