@@ -14,9 +14,8 @@ class MlpMixer(nn.Module):
         self.num_classes = num_classes
 
         self.fc1 = nn.Sequential(
+            nn.LayerNorm(input_dim),
             nn.Linear(input_dim, hidden_dim),
-            # nn.LayerNorm(hidden_dim),
-            nn.ReLU()
         )
 
         self.k = 64
@@ -25,7 +24,10 @@ class MlpMixer(nn.Module):
         self.intra_region2 = IntraRegionK(hidden_dim, self.k, self.k ** 2, use_pos=False, scale=scale) 
         self.intra_region3 = IntraRegionK(hidden_dim, self.k, self.k ** 3, use_pos=False, scale=scale) 
 
-        self.fc2 = nn.Linear(hidden_dim, self.num_classes)
+        self.fc2 = nn.Sequential(
+            nn.LayerNorm(hidden_dim),
+            nn.Linear(hidden_dim, self.num_classes),
+        )
 
     def forward(self, **kwargs):
 
@@ -64,16 +66,19 @@ class IntraRegionK(nn.Module):
             nn.ReLU(),
         )
 
-        if use_pos:
-            self.intra_fc = nn.Sequential(
-                    nn.Linear(hidden_dim, hidden_dim),
-                    nn.ReLU(),
-                    nn.Linear(hidden_dim, 1),
-                )
-        else:
-            self.intra_fc = nn.Sequential(
-                nn.Linear(hidden_dim, hidden_dim),
-            )
+        # if use_pos:
+        #     self.intra_fc = nn.Sequential(
+        #             nn.Linear(hidden_dim, hidden_dim),
+        #             nn.ReLU(),
+        #             nn.Linear(hidden_dim, 1),
+        #         )
+        # else:
+        #     self.intra_fc = nn.Sequential(
+        #         nn.Linear(hidden_dim, hidden_dim),
+        #     )
+        self.intra_fc = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim)
+        )
 
         print(self.intra_fc)
 
@@ -101,10 +106,14 @@ class IntraRegionK(nn.Module):
         x = self.unroll_all(x)
         x = self.intra_fc(x)
 
-        if self.use_pos:
-            # x = x.softmax(dim=1)
-            # 87+
-            x = (x * res).sum(dim=1, keepdim=True)
+
+        # if self.use_pos:
+        #     # x = x.softmax(dim=1)
+        #     # 87+
+        #     # x = (x * res).sum(dim=1, keepdim=True)
+        #     # x = x.softmax(dim=-2)
+        #     x = x.sigmoid()
+        #     x = x * res
 
         x = res + x
         return x

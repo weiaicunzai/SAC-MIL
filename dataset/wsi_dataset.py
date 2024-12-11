@@ -78,7 +78,6 @@ class WSIDataset(data.Dataset):
         slide_id = self.slide_names[idx]
         label = self.wsis[slide_id]
         full_path = os.path.join(self.feat_dir, '{}.pt'.format(slide_id))
-        # print(full_path)
 
         features = torch.load(full_path)
 
@@ -89,9 +88,6 @@ class WSIDataset(data.Dataset):
         features = features[idx]
         pos = pos[idx]
 
-        # print(full_path)
-        # print(os.path.join(self.pos, slide_id + '.pt'))
-        # print(pos.shape, features.shape)
         if self.data_set == 'train':
             index = [x for x in range(features.shape[0])]
             random.shuffle(index)

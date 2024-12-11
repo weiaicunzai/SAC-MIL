@@ -16,7 +16,6 @@ def load_loggers(log_root, dataset_name, fold):
     # log_name = Path(cfg.config).parent
     # version_name = Path(cfg.config).name[:-5]
     # cfg.log_path = Path(log_path) / log_name / version_name / f'fold{cfg.Data.fold}'
-    # print(f'---->Log dir: {cfg.log_path}')
 
     # DATE_FORMAT = '%A_%d_%B_%Y_%Hh_%Mm_%Ss'
     # #time of we run the script

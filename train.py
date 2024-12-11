@@ -60,10 +60,6 @@ def main(args):
     if args.stage == 'train':
         trainer.fit(model = model, datamodule = dm)
     else:
-        # model_paths = list(cfg.log_path.glob('*.ckpt'))
-        # model_paths = [str(model_path) for model_path in model_paths if 'epoch' in str(model_path)]
-        # for path in model_paths:
-        #     print(path)
         new_model = ModelInterface.load_from_checkpoint(args.ckpt)
         trainer.test(model=new_model, datamodule=dm)
 

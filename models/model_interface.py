@@ -71,12 +71,13 @@ class  ModelInterface(pl.LightningModule):
 
         if (self.current_epoch - self.last_logged_epoch) >= self.log_weight_histogram_every:
             for name, param in self.named_parameters():
-                if 'weight' in name:  # 只记录权重，忽略偏置等其他参数
-                    self.logger.experiment.add_histogram(
-                        tag=f"weights/{name}",
-                        values=param.detach().cpu().numpy(),
-                        global_step=self.global_step
-                    )
+                # if 'weight' in name:  # 只记录权重，忽略偏置等其他参数
+                self.logger.experiment.add_histogram(
+                    tag=f"weights/{name}",
+                    values=param.detach().cpu().numpy(),
+                    global_step=self.global_step
+                )
+                
             self.last_logged_epoch = self.current_epoch
 
     def validation_step(self, batch, batch_idx):
@@ -98,8 +99,8 @@ class  ModelInterface(pl.LightningModule):
         res = self.valid_metrics.compute()
 
         self.log('val_acc', res['val_MulticlassAccuracy'], logger=True)
-        self.log('val_acc', res['val_MulticlassAUROC'], logger=True)
-        self.log('val_acc', res['val_MulticlassF1Score'], logger=True)
+        self.log('val_auc', res['val_MulticlassAUROC'], logger=True)
+        self.log('val_f1', res['val_MulticlassF1Score'], logger=True)
 
         if self.best_acc is None:
             self.best_acc = res
@@ -166,10 +167,6 @@ class  ModelInterface(pl.LightningModule):
             for name, param in self.named_parameters():
                 if param.grad is not None:
 
-                    # torch.save(param.grad.cpu(), 'test.pt')
-                    # print(torch.isnan(param.grad).sum())
-                    # print(torch.isinf(param.grad).sum())
-                    # print(param.grad.shape, name)
                     self.logger.experiment.add_histogram(
                         tag=f"gradients/{name}",
                         values=param.grad,
@@ -179,7 +176,6 @@ class  ModelInterface(pl.LightningModule):
 
 
 
-        # print(self.global_step, self.last_logged_step_act, self.log_activations_every)
         """在反向传播之后记录激活值直方图"""
         if (self.global_step - self.last_logged_step_act) >= self.log_activations_every:
             for name, activation in self.activations.items():
