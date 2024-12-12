@@ -231,7 +231,7 @@ class RotaryEmbedding(Module):
     ):
         angles = self.rotate_angle(pos)
 
-        if self.mode:
+        if self.mod:
             angles = angles % self.mod
 
 
