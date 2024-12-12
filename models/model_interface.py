@@ -98,8 +98,8 @@ class  ModelInterface(pl.LightningModule):
         res = self.valid_metrics.compute()
 
         self.log('val_acc', res['val_MulticlassAccuracy'], logger=True)
-        self.log('val_acc', res['val_MulticlassAUROC'], logger=True)
-        self.log('val_acc', res['val_MulticlassF1Score'], logger=True)
+        self.log('val_auc', res['val_MulticlassAUROC'], logger=True)
+        self.log('val_f1', res['val_MulticlassF1Score'], logger=True)
 
         if self.best_acc is None:
             self.best_acc = res
@@ -130,8 +130,8 @@ class  ModelInterface(pl.LightningModule):
 
         elif model.lower() == 'mixer':
             from models.mixer import MlpMixer
-            model = MlpMixer(input_dim=1024, hidden_dim=512, scale=32768)
-            # model = MlpMixer(input_dim=1024, hidden_dim=512, scale=512)
+            # model = MlpMixer(input_dim=1024, hidden_dim=512, scale=32768)
+            model = MlpMixer(input_dim=1024, hidden_dim=512, scale=512)
 
         else:
             raise ValueError("wrong model name")

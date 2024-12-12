@@ -103,7 +103,7 @@ class RotaryEmbedding(Module):
         # cache_if_possible = True,
         # cache_max_seq_len = 8192,
         scale=1,
-        mod=pi
+        mod=None
     ):
         super().__init__()
         # proposed by reddit user bloc97, to rescale rotary embeddings to longer sequence length without fine-tuning
@@ -231,7 +231,8 @@ class RotaryEmbedding(Module):
     ):
         angles = self.rotate_angle(pos)
 
-        angles = angles % self.mod
+        if self.mode:
+            angles = angles % self.mod
 
 
         return apply_rotary_emb(angles, x, scale = 1, seq_dim = -2)

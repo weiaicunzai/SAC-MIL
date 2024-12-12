@@ -83,7 +83,7 @@ class IntraRegionK(nn.Module):
         print('use_pos: ', self.use_pos)
         if self.use_pos is True:
             from models.pos import RotaryEmbedding as pos_emb
-            self.pos_emb = pos_emb(hidden_dim, scale=scale)
+            self.pos_emb = pos_emb(hidden_dim, scale=scale, mod=math.pi * 2)
 
         self.hidden_dim = hidden_dim
 
