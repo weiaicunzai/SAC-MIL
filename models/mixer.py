@@ -21,9 +21,9 @@ class MlpMixer(nn.Module):
 
         self.k = 64
 
-        self.intra_region1 = IntraRegionK(hidden_dim, self.k, self.k ** 1, use_pos=True, scale=scale) 
-        self.intra_region2 = IntraRegionK(hidden_dim, self.k, self.k ** 2, use_pos=False, scale=scale) 
-        self.intra_region3 = IntraRegionK(hidden_dim, self.k, self.k ** 3, use_pos=False, scale=scale) 
+        self.intra_region1 = IntraRegionK(hidden_dim, self.k, self.k ** 1, use_pos=True, scale=scale)
+        self.intra_region2 = IntraRegionK(hidden_dim, self.k, self.k ** 2, use_pos=False, scale=scale)
+        self.intra_region3 = IntraRegionK(hidden_dim, self.k, self.k ** 3, use_pos=False, scale=scale)
 
         self.fc2 = nn.Linear(hidden_dim, self.num_classes)
 
@@ -47,6 +47,126 @@ class MlpMixer(nn.Module):
         results_dict = {'logits': logits, 'Y_prob': Y_prob}
 
         return results_dict
+
+class IntraAttn(nn.Module):
+    def __init__(self, hidden_dim, k, region_size):
+        super().__init__()
+        self.k = k
+        self.region_size = region_size
+        layer_idx = math.log(self.region_size, self.k) - 1
+        self.scale = int(self.k ** layer_idx)
+
+        self.inter_fc = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+        )
+
+        self.intra_fc = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+        )
+
+
+    def forward(self, x):
+
+        x = self.roll_all(x)
+        x = self.inter_fc(x)
+        x = self.unroll_all(x)
+        x = self.intra_fc(x)
+
+        return x
+
+
+    def split_parts(self, n):
+        if n < self.region_size:
+            return n
+
+        mod = n % self.region_size
+        num_part1 = n - mod
+
+        assert num_part1 > 0
+
+        return num_part1
+
+    def roll_all(self, x):
+        num_tokens = x.shape[1]
+
+        num_part1 = self.split_parts(num_tokens)
+
+        part1 = x[:, :num_part1, :]
+        part2 = x[:, num_part1:, :]
+
+        part1 = self.roll(part1)
+        part2 = self.roll(part2)
+
+        return torch.cat([part1, part2], dim=-2)
+
+    def unroll_all(self, x):
+        num_tokens = x.shape[1]
+
+        num_part1 = self.split_parts(num_tokens)
+
+        part1 = x[:, :num_part1, :]
+        part2 = x[:, num_part1:, :]
+
+        part1 = self.unroll(part1)
+        part2 = self.unroll(part2)
+
+        return torch.cat([part1, part2], dim=-2)
+
+    def unroll(self, x):
+        if x.shape[-2] == 0:
+            return x
+
+        B, L, D = x.shape
+
+        if L >= self.region_size:
+            x = x.view(B, -1, self.region_size, D)
+
+        x = x.split(
+            D // self.k,
+            dim=-1
+        )
+
+        res = []
+
+        for idx, chunk in enumerate(x):
+            chunk = torch.roll(chunk, -idx * self.scale, dims=-2)
+            res.append(chunk)
+
+        res = torch.cat(res, dim=-1)
+
+        if L >= self.region_size:
+            res = res.view(B, L, D)
+
+        return res
+
+    def roll(self, x):
+
+        if x.shape[-2] == 0:
+            return x
+
+        B, L, D = x.shape
+
+        if L >= self.region_size:
+            x = x.view(B, -1, self.region_size, D)
+
+        x = x.split(
+            D // self.k,
+            dim=-1
+        )
+
+        res = []
+        for idx, chunk in enumerate(x):
+            chunk = torch.roll(chunk, idx * self.scale, dims=-2)
+            res.append(chunk)
+
+        res = torch.cat(res, dim=-1)
+
+        if L >= self.region_size:
+            res = res.view(B, L, D)
+
+        return res
+
 
 class IntraRegionK(nn.Module):
     def __init__(self, hidden_dim, k, region_size, use_pos, scale):
@@ -90,27 +210,27 @@ class IntraRegionK(nn.Module):
 
     def mixer_attn(self, x, pos):
         res = x
-        x = self.norm1(x)
+        # x = self.norm1(x)
 
         if self.use_pos:
             # x = self.pos_emb.rotate_queries_or_keys(x, pos)
             x = self.pos_emb(x, pos)
 
-        x = self.roll_all(x)
-        x = self.inter_fc(x)
-        x = self.unroll_all(x)
-        x = self.intra_fc(x)
+        # x = self.roll_all(x)
+        # x = self.inter_fc(x)
+        # x = self.unroll_all(x)
+        # x = self.intra_fc(x)
 
         if self.use_pos:
             # x = x.softmax(dim=1)
             # 87+
             x = (x * res).sum(dim=1, keepdim=True)
 
-        x = res + x
+        # x = res + x
         return x
 
 
-    def forward(self, x, pos):
+    def forward(self, x, pos=None):
 
 
         x = self.mixer_attn(x, pos)

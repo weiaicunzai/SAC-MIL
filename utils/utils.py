@@ -11,26 +11,14 @@ TIME_NOW = datetime.now().strftime(DATE_FORMAT)
 from pytorch_lightning import loggers as pl_loggers
 def load_loggers(log_root, dataset_name, fold):
 
-    # log_path = cfg.General.log_path
-    # Path(log_path).mkdir(exist_ok=True, parents=True)
-    # log_name = Path(cfg.config).parent
-    # version_name = Path(cfg.config).name[:-5]
-    # cfg.log_path = Path(log_path) / log_name / version_name / f'fold{cfg.Data.fold}'
-    # print(f'---->Log dir: {cfg.log_path}')
-
-    # DATE_FORMAT = '%A_%d_%B_%Y_%Hh_%Mm_%Ss'
-    # #time of we run the script
-    # TIME_NOW = datetime.now().strftime(DATE_FORMAT)
-
     log_path = os.path.join(log_root, dataset_name, fold, TIME_NOW)
+    print('log_path', log_path)
     os.makedirs(log_path)
 
     #---->TensorBoard
-    tb_logger = pl_loggers.TensorBoardLogger(log_path+str(log_path),
+    tb_logger = pl_loggers.TensorBoardLogger(log_path,
                                              log_graph = True, default_hp_metric = False)
     print(hasattr(tb_logger, 'experiments'))
-    #---->CSV
-    # csv_logger = pl_loggers.CSVLogger(log_path)
 
     return [tb_logger]
 
