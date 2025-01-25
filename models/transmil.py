@@ -75,11 +75,11 @@ class IntraRegionKTest(nn.Module):
 
         self.norm1 = nn.LayerNorm(hidden_dim)
 
-        # self.use_pos = use_pos
-        # print('use_pos: ', self.use_pos)
-        # if self.use_pos is True:
-        #     from models.pos import RotaryEmbedding as pos_emb
-        #     self.pos_emb = pos_emb(hidden_dim, scale=scale, mod=math.pi * 2)
+        self.use_pos = use_pos
+        print('use_pos: ', self.use_pos)
+        if self.use_pos is True:
+            from models.pos import RotaryEmbedding as pos_emb
+            self.pos_emb = pos_emb(hidden_dim, scale=scale, mod=math.pi * 2)
 
         self.hidden_dim = hidden_dim
 
