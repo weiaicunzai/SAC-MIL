@@ -156,7 +156,7 @@ class  ModelInterface(pl.LightningModule):
             ]),
             2
         )
-        
+
         # Log the global gradient norm
         self.logger.experiment.add_scalar('global_grad_norm', grad_norm, self.global_step)
 
@@ -165,16 +165,17 @@ class  ModelInterface(pl.LightningModule):
         if (self.global_step - self.last_logged_step_hist) >= self.log_grad_histogram_every:
             for name, param in self.named_parameters():
                 if param.grad is not None:
-
-                    # torch.save(param.grad.cpu(), 'test.pt')
-                    # print(torch.isnan(param.grad).sum())
-                    # print(torch.isinf(param.grad).sum())
-                    # print(param.grad.shape, name)
-                    self.logger.experiment.add_histogram(
-                        tag=f"gradients/{name}",
-                        values=param.grad,
-                        global_step=self.global_step
-                    )
+                    try:
+                        self.logger.experiment.add_histogram(
+                            tag=f"gradients/{name}",
+                            values=param.grad,
+                            global_step=self.global_step
+                        )
+                    except Exception as e:
+                        print('global_step:', self.global_step)
+                        print('name:', name)
+                        torch.save(param.grad, 'gradients_{}_{}.pt'.format(self.global_step, name))
+                        print(e)
             self.last_logged_step_hist = self.global_step
 
 
@@ -206,4 +207,3 @@ class  ModelInterface(pl.LightningModule):
 
         for name, layer in self.model.named_modules():
             layer.register_forward_hook(get_activation(name))
-        
