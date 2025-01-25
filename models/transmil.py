@@ -73,7 +73,7 @@ class IntraRegionKTest(nn.Module):
 
         # print(self.intra_fc)
 
-        # self.norm1 = nn.LayerNorm(hidden_dim)
+        self.norm1 = nn.LayerNorm(hidden_dim)
 
         # self.use_pos = use_pos
         # print('use_pos: ', self.use_pos)
