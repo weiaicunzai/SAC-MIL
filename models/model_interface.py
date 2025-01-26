@@ -176,6 +176,11 @@ class  ModelInterface(pl.LightningModule):
                         print('name:', name)
                         torch.save(param.grad, 'gradients_{}_{}.pt'.format(self.global_step, name))
                         print(e)
+                        self.logger.experiment.add_histogram(
+                            tag=f"gradients/{name}",
+                            values=torch.randn_like(param.grad),
+                            global_step=self.global_step
+                        )
             self.last_logged_step_hist = self.global_step
 
 

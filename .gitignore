@@ -249,3 +249,4 @@ run2.sh
 sss_sigmoid
 sss_softmax
 sssss
+*.pt

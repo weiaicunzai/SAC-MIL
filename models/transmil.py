@@ -71,7 +71,7 @@ class IntraRegionKTest(nn.Module):
                 nn.Linear(hidden_dim, hidden_dim),
             )
 
-        # print(self.intra_fc)
+        print(self.intra_fc)
 
         self.norm1 = nn.LayerNorm(hidden_dim)
 
@@ -83,8 +83,128 @@ class IntraRegionKTest(nn.Module):
 
         self.hidden_dim = hidden_dim
 
-    def forward(self, x):
+
+
+    def mixer_attn(self, x, pos):
+        res = x
+        x = self.norm1(x)
+
+        if self.use_pos:
+            # x = self.pos_emb.rotate_queries_or_keys(x, pos)
+            x = self.pos_emb(x, pos)
+
+        x = self.roll_all(x)
+        x = self.inter_fc(x)
+        x = self.unroll_all(x)
+        x = self.intra_fc(x)
+
+        if self.use_pos:
+            # x = x.softmax(dim=1)
+            # 87+
+            x = (x * res).sum(dim=1, keepdim=True)
+
+        x = res + x
         return x
+
+
+    def forward(self, x, pos=None):
+
+
+        x = self.mixer_attn(x, pos)
+
+
+        return x
+
+    def split_parts(self, n):
+        if n < self.region_size:
+            return n
+
+        mod = n % self.region_size
+        num_part1 = n - mod
+
+        assert num_part1 > 0
+
+        return num_part1
+
+    def roll_all(self, x):
+        num_tokens = x.shape[1]
+
+        num_part1 = self.split_parts(num_tokens)
+
+        part1 = x[:, :num_part1, :]
+        part2 = x[:, num_part1:, :]
+
+        part1 = self.roll(part1)
+        part2 = self.roll(part2)
+
+        return torch.cat([part1, part2], dim=-2)
+
+    def unroll_all(self, x):
+        num_tokens = x.shape[1]
+
+        num_part1 = self.split_parts(num_tokens)
+
+        part1 = x[:, :num_part1, :]
+        part2 = x[:, num_part1:, :]
+
+        part1 = self.unroll(part1)
+        part2 = self.unroll(part2)
+
+        return torch.cat([part1, part2], dim=-2)
+
+    def unroll(self, x):
+        if x.shape[-2] == 0:
+            return x
+
+        B, L, D = x.shape
+
+        if L >= self.region_size:
+            x = x.view(B, -1, self.region_size, D)
+
+        x = x.split(
+            D // self.k,
+            dim=-1
+        )
+
+        res = []
+
+        for idx, chunk in enumerate(x):
+            chunk = torch.roll(chunk, -idx * self.scale, dims=-2)
+            res.append(chunk)
+
+        res = torch.cat(res, dim=-1)
+
+        if L >= self.region_size:
+            res = res.view(B, L, D)
+
+        return res
+
+    def roll(self, x):
+
+        if x.shape[-2] == 0:
+            return x
+
+        B, L, D = x.shape
+
+        if L >= self.region_size:
+            x = x.view(B, -1, self.region_size, D)
+
+        x = x.split(
+            D // self.k,
+            dim=-1
+        )
+
+        res = []
+        for idx, chunk in enumerate(x):
+            chunk = torch.roll(chunk, idx * self.scale, dims=-2)
+            res.append(chunk)
+
+        res = torch.cat(res, dim=-1)
+
+        if L >= self.region_size:
+            res = res.view(B, L, D)
+
+        return res
 
 
 class TransMIL(nn.Module):
@@ -108,6 +228,8 @@ class TransMIL(nn.Module):
         h = kwargs['data'].float() #[B, n, 1024]
 
         h = self._fc1(h) #[B, n, 512]
+
+        print(h.shape)
 
         #---->pad
         H = h.shape[1]
