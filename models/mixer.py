@@ -207,28 +207,26 @@ class IntraRegionK(nn.Module):
 
         self.hidden_dim = hidden_dim
 
-
     def mixer_attn(self, x, pos):
         res = x
-        # x = self.norm1(x)
+        x = self.norm1(x)
 
         if self.use_pos:
             # x = self.pos_emb.rotate_queries_or_keys(x, pos)
             x = self.pos_emb(x, pos)
 
-        # x = self.roll_all(x)
-        # x = self.inter_fc(x)
-        # x = self.unroll_all(x)
-        # x = self.intra_fc(x)
+        x = self.roll_all(x)
+        x = self.inter_fc(x)
+        x = self.unroll_all(x)
+        x = self.intra_fc(x)
 
         if self.use_pos:
             # x = x.softmax(dim=1)
             # 87+
             x = (x * res).sum(dim=1, keepdim=True)
 
-        # x = res + x
+        x = res + x
         return x
-
 
     def forward(self, x, pos=None):
 
