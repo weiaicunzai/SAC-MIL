@@ -210,15 +210,23 @@ class IntraRegionKTest(nn.Module):
 class TransMIL(nn.Module):
     def __init__(self, n_classes):
         super(TransMIL, self).__init__()
-        self.pos_layer = PPEG(dim=512)
+        # self.pos_layer = PPEG(dim=512)
         self._fc1 = nn.Sequential(nn.Linear(1024, 512), nn.ReLU())
-        self.cls_token = nn.Parameter(torch.randn(1, 1, 512))
+        # self.cls_token = nn.Parameter(torch.randn(1, 1, 512))
         self.n_classes = n_classes
-        self.layer1 = TransLayer(dim=512)
+        # self.layer1 = TransLayer(dim=512)
         # self.layer2 = TransLayer(dim=512)
         # def __init__(self, hidden_dim, k, region_size, use_pos, scale):
         # self.layer2 = IntraRegionK(512, k=64, region_size=64, use_pos=False, scale=512)
-        self.layer2 = IntraRegionKTest(512, k=64, region_size=64, use_pos=False, scale=512)
+
+        self.k = 64
+
+        self.layer1 = IntraRegionKTest(512, k=self.k, region_size=self.k ** 1, use_pos=True, scale=512)
+        self.layer2 = IntraRegionKTest(512, k=self.k, region_size=self.k ** 2, use_pos=False, scale=512)
+        # self.layer3 = IntraRegionKTest(512, k=self.k, region_size=self.k ** 2, use_pos=False, scale=512)
+        # self.intra_region1 = IntraRegionK(hidden_dim, self.k, self.k ** 1, use_pos=True, scale=scale)
+        # self.intra_region2 = IntraRegionK(hidden_dim, self.k, self.k ** 2, use_pos=False, scale=scale)
+        # self.intra_region3 = IntraRegionK(hidden_dim, self.k, self.k ** 3, use_pos=False, scale=scale)
         self.norm = nn.LayerNorm(512)
         self._fc2 = nn.Linear(512, self.n_classes)
 
@@ -232,21 +240,21 @@ class TransMIL(nn.Module):
         print(h.shape)
 
         #---->pad
-        H = h.shape[1]
-        _H, _W = int(np.ceil(np.sqrt(H))), int(np.ceil(np.sqrt(H)))
-        add_length = _H * _W - H
-        h = torch.cat([h, h[:,:add_length,:]],dim = 1) #[B, N, 512]
+        # H = h.shape[1]
+        # _H, _W = int(np.ceil(np.sqrt(H))), int(np.ceil(np.sqrt(H)))
+        # add_length = _H * _W - H
+        # h = torch.cat([h, h[:,:add_length,:]],dim = 1) #[B, N, 512]
 
         #---->cls_token
-        B = h.shape[0]
-        cls_tokens = self.cls_token.expand(B, -1, -1).cuda()
-        h = torch.cat((cls_tokens, h), dim=1)
+        # B = h.shape[0]
+        # cls_tokens = self.cls_token.expand(B, -1, -1).cuda()
+        # h = torch.cat((cls_tokens, h), dim=1)
 
         #---->Translayer x1
         h = self.layer1(h) #[B, N, 512]
 
         #---->PPEG
-        h = self.pos_layer(h, _H, _W) #[B, N, 512]
+        # h = self.pos_layer(h, _H, _W) #[B, N, 512]
 
         #---->Translayer x2
         h = self.layer2(h) #[B, N, 512]
