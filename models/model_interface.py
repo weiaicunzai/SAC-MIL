@@ -156,10 +156,12 @@ class  ModelInterface(pl.LightningModule):
         elif model.lower() == 'dsmil':
             from models.dsmil import MILNet
             model = MILNet(input_dimension=1024, hidden_dim=512, n_classes=2)
-
-        elif model.lower() == 'clam':
+        elif model.lower() == 'clam_sb':
             from models.clam import CLAM_SB
             model = CLAM_SB()
+        elif model.lower() == 'clam_mb':
+            from models.clam import CLAM_MB
+            model = CLAM_MB()
         else:
             raise ValueError("wrong model name")
         self.model = model

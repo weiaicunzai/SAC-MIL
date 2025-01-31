@@ -1,21 +1,7 @@
-import sys
-import os
-sys.path.append(os.getcwd())
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from models.topk.svm import SmoothTop1SVM
-
-def initialize_weights(module):
-	for m in module.modules():
-		if isinstance(m, nn.Linear):
-			nn.init.xavier_normal_(m.weight)
-			m.bias.data.zero_()
-
-		elif isinstance(m, nn.BatchNorm1d):
-			nn.init.constant_(m.weight, 1)
-			nn.init.constant_(m.bias, 0)
 
 """
 Attention Network without Gating (2 fc layers)
@@ -87,25 +73,18 @@ args:
     instance_loss_fn: loss function to supervise instance-level training
     subtyping: whether it's a subtyping problem
 """
-
-
+import copy
 class CLAM_SB(nn.Module):
-    def __init__(self, gate = True, size_arg = "small", dropout = 0., k_sample=8, n_classes=2,
-        instance_loss_fn=SmoothTop1SVM(2), subtyping=False,test=False,act='relu',n_robust=0):
+    def __init__(self, gate = True, size_arg = "small", dropout = False, k_sample=8, n_classes=2,
+        instance_loss_fn=nn.CrossEntropyLoss(), subtyping=False):
         super(CLAM_SB, self).__init__()
-        self.size_dict = {"small": [1024, 512, 256], "big": [1024, 512, 384],"hipt": [192, 512, 256]}
+        self.size_dict = {"small": [1024, 512, 256], "big": [1024, 512, 384]}
+
         size = self.size_dict[size_arg]
-        # fc = [nn.Linear(size[0], size[1]), nn.GELU()]
+        fc = [nn.Linear(size[0], size[1]), nn.ReLU()]
 
-        fc = [nn.Linear(size[0], size[1])]
-
-        if act.lower() == 'gelu':
-            fc += [nn.GELU()]
-        else:
-            fc += [nn.ReLU()]
-
-        if dropout != 0.:
-            fc.append(nn.Dropout(dropout))
+        if dropout:
+            fc.append(nn.Dropout(0.25))
         if gate:
             attention_net = Attn_Net_Gated(L = size[1], D = size[2], dropout = dropout, n_classes = 1)
         else:
@@ -116,12 +95,9 @@ class CLAM_SB(nn.Module):
         instance_classifiers = [nn.Linear(size[1], 2) for i in range(n_classes)]
         self.instance_classifiers = nn.ModuleList(instance_classifiers)
         self.k_sample = k_sample
-        self.instance_loss_fn = SmoothTop1SVM(2).cuda()
-        # self.instance_loss_fn = nn.CrossEntropyLoss()
+        self.instance_loss_fn = instance_loss_fn
         self.n_classes = n_classes
         self.subtyping = subtyping
-
-        self.apply(initialize_weights)
 
     def relocate(self):
         device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -131,10 +107,10 @@ class CLAM_SB(nn.Module):
 
     @staticmethod
     def create_positive_targets(length, device):
-        return torch.full((length, ), 1, device=device).long()
+        return torch.full((length, ), 1, device=device,dtype=torch.long)
     @staticmethod
     def create_negative_targets(length, device):
-        return torch.full((length, ), 0, device=device).long()
+        return torch.full((length, ), 0, device=device,dtype=torch.long)
 
     #instance-level evaluation for in-the-class attention branch
     def inst_eval(self, A, h, classifier):
@@ -152,7 +128,6 @@ class CLAM_SB(nn.Module):
         all_instances = torch.cat([top_p, top_n], dim=0)
         logits = classifier(all_instances)
         all_preds = torch.topk(logits, 1, dim = 1)[1].squeeze(1)
-
         instance_loss = self.instance_loss_fn(logits, all_targets)
         return instance_loss, all_preds, all_targets
 
@@ -169,24 +144,28 @@ class CLAM_SB(nn.Module):
         instance_loss = self.instance_loss_fn(logits, p_targets)
         return instance_loss, p_preds, p_targets
 
-    # def forward(self, h, label=None, instance_eval=False, return_features=False, attention_only=False):
+    # def forward(self, h, label=None, instance_eval=False, return_features=False, attention_only=False, train_epoch=-1,
+                # testing=False, instance_mask=None):
 
     def forward(self, **kwargs):
-        h = kwargs['data']
-        instance_eval=False
-        return_features=False
-        attention_only=False
-        label = None
+        h = kwargs['data'].float() #[B, n, 1024]
+        assert h.shape[0] == 1
+        label = kwargs.get('label', None)
+        instance_eval = kwargs.get('instance_eval', False)
+        return_features = kwargs.get('return_features', False)
+        attention_only = kwargs.get('attention_only', False)
+        train_epoch = kwargs.get('train_epoch', -1)
+        testing = kwargs.get('testing', False)
+        instance_mask = kwargs.get('instance_mask', None)
 
-        device = h.device
-        ps = h.size(1)
-        A, h = self.attention_net(h.squeeze())  # NxK
+        h = h.squeeze(dim=0)
+        A, h = self.attention_net(h)  # NxK
         A = torch.transpose(A, 1, 0)  # KxN
         if attention_only:
             return A
         A_raw = A
-        A = F.softmax(A, dim=1)  # softmax over N
 
+        A = F.softmax(A, dim=1)  # softmax over N
         if instance_eval:
             total_inst_loss = 0.0
             all_preds = []
@@ -211,44 +190,40 @@ class CLAM_SB(nn.Module):
             if self.subtyping:
                 total_inst_loss /= len(self.instance_classifiers)
 
+        # print(A.shape, h.shape)
         M = torch.mm(A, h)
+        # print(M.shape)
+        # import sys; sys.exit()
+
         logits = self.classifiers(M)
         Y_hat = torch.topk(logits, 1, dim = 1)[1]
         Y_prob = F.softmax(logits, dim = 1)
-
-
+        # results_dict = {'instance_loss': torch.tensor(0), 'inst_labels': torch.tensor(0),
+        #     'inst_preds': torch.tensor(0)}
         if instance_eval:
             results_dict = {'instance_loss': total_inst_loss, 'inst_labels': np.array(all_targets),
-            'inst_preds': np.array(all_preds)}
+                            'inst_preds': np.array(all_preds)}
         else:
-            results_dict = {}
+            results_dict = {'instance_loss': torch.tensor([0]).cuda(), 'inst_labels':np.array([0]),
+                            'inst_preds':np.array([0])}
         if return_features:
             results_dict.update({'features': M})
 
-        if instance_eval:
-            return logits,total_inst_loss,ps
-        else:
-            results_dict = {'logits': logits, 'Y_prob': Y_prob}
-            return results_dict
+        results_dict = {}
+        results_dict['logits'] = logits
+        results_dict['Y_prob'] = Y_prob
+
+        return results_dict
 
 class CLAM_MB(CLAM_SB):
-    def __init__(self, gate = True, size_arg = "small", dropout = 0., k_sample=8, n_classes=2,
-        instance_loss_fn=SmoothTop1SVM(2), subtyping=False,act='relu'):
+    def __init__(self, gate = True, size_arg = "small", dropout = False, k_sample=8, n_classes=2,
+        instance_loss_fn=nn.CrossEntropyLoss(), subtyping=False):
         nn.Module.__init__(self)
         self.size_dict = {"small": [1024, 512, 256], "big": [1024, 512, 384]}
         size = self.size_dict[size_arg]
-        #fc = [nn.Linear(size[0], size[1]), nn.ReLU()]
-
-        fc = [nn.Linear(size[0], size[1])]
-
-        if act.lower() == 'gelu':
-            fc += [nn.GELU()]
-        else:
-            fc += [nn.ReLU()]
-
-        if dropout != 0.:
-            fc.append(nn.Dropout(dropout))
-
+        fc = [nn.Linear(size[0], size[1]), nn.ReLU()]
+        if dropout:
+            fc.append(nn.Dropout(0.25))
         if gate:
             attention_net = Attn_Net_Gated(L = size[1], D = size[2], dropout = dropout, n_classes = n_classes)
         else:
@@ -260,22 +235,23 @@ class CLAM_MB(CLAM_SB):
         instance_classifiers = [nn.Linear(size[1], 2) for i in range(n_classes)]
         self.instance_classifiers = nn.ModuleList(instance_classifiers)
         self.k_sample = k_sample
-        self.instance_loss_fn = SmoothTop1SVM(2).cuda()
-        # self.instance_loss_fn = nn.CrossEntropyLoss()
+        self.instance_loss_fn = instance_loss_fn
         self.n_classes = n_classes
         self.subtyping = subtyping
-        initialize_weights(self)
 
-    # def forward(self, h, label=None, instance_eval=False, return_features=False, attention_only=False):
     def forward(self, **kwargs):
-        h = kwargs['data']
-        instance_eval=False
-        return_features=False
-        attention_only=False
-        label = None
+
+        h = kwargs['data'].float() #[B, n, 1024]
+        assert h.shape[0] == 1
+        h = h.squeeze(dim=0)
+
+        label = kwargs.get('label', None)
+        instance_eval = kwargs.get('instance_eval', False)
+        return_features = kwargs.get('return_features', False)
+        attention_only = kwargs.get('attention_only', False)
+
         device = h.device
-        ps = h.size(1)
-        A, h = self.attention_net(h.squeeze())  # NxK
+        A, h = self.attention_net(h)  # NxK
         A = torch.transpose(A, 1, 0)  # KxN
         if attention_only:
             return A
@@ -286,9 +262,7 @@ class CLAM_MB(CLAM_SB):
             total_inst_loss = 0.0
             all_preds = []
             all_targets = []
-
             inst_labels = F.one_hot(label, num_classes=self.n_classes).squeeze() #binarize label
-
             for i in range(len(self.instance_classifiers)):
                 inst_label = inst_labels[i].item()
                 classifier = self.instance_classifiers[i]
@@ -314,7 +288,6 @@ class CLAM_MB(CLAM_SB):
             logits[0, c] = self.classifiers[c](M[c])
         Y_hat = torch.topk(logits, 1, dim = 1)[1]
         Y_prob = F.softmax(logits, dim = 1)
-
         if instance_eval:
             results_dict = {'instance_loss': total_inst_loss, 'inst_labels': np.array(all_targets),
             'inst_preds': np.array(all_preds)}
@@ -322,17 +295,10 @@ class CLAM_MB(CLAM_SB):
             results_dict = {}
         if return_features:
             results_dict.update({'features': M})
+        # return logits, Y_prob, Y_hat, A_raw, results_dict
 
-        if instance_eval:
-            return logits,total_inst_loss,ps
-        else:
-            results_dict = {'logits': logits, 'Y_prob': Y_prob}
-            return results_dict
+        results_dict = {}
+        results_dict['logits'] = logits
+        results_dict['Y_prob'] = Y_prob
 
-
-if __name__ == '__main__':
-    net = CLAM_MB()
-    input = torch.randn(1, 1001, 1024)
-
-    out = net(input)
-    print(out)
+        return results_dict
