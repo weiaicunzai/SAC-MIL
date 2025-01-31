@@ -55,21 +55,9 @@ class  ModelInterface(pl.LightningModule):
 
         results_dict = self.model(data=data, pos=pos, label=label)
 
-        if self.model_name.lower() == 'dsmil':
-            bag_prediction = results_dict['bag_prediction']
-            max_prediction = results_dict['max_prediction']
-            # print(bag_prediction.shape, label.shape)
-            # loss_bag = self.loss(bag_prediction.view(1, -1), label.view(1, -1))
-            loss_bag = self.loss(bag_prediction, label)
-            # loss_max = self.loss(max_prediction.view(1, -1), label.view(1, -1))
-            # print(max_prediction.shape, label.shape)
-            loss_max = self.loss(max_prediction, label)
-            loss_total = 0.5*loss_bag + 0.5*loss_max
-            loss = loss_total.mean()
-        else:
-            logits = results_dict['logits']
+        logits = results_dict['logits']
 
-            loss = self.loss(logits, label)
+        loss = self.loss(logits, label)
 
         self.log('train_loss', loss, on_step=True, prog_bar=True, logger=True)
 
@@ -97,17 +85,9 @@ class  ModelInterface(pl.LightningModule):
         with torch.no_grad():
             results_dict = self.model(data=data, pos=pos, label=label)
 
-        # if self.model_name.lower() == 'dsmil':
-        #     logits = results_dict['prediction_bag']
-        #     Y_prob =
-
-        # else:
-
         logits = results_dict['logits']
         Y_prob = results_dict['Y_prob']
 
-        # print(Y_prob.shape, logits.shape)
-        # import sys; sys.exit()
         self.valid_metrics.update(Y_prob, label)
 
         return {'logits' : logits, 'Y_prob' : Y_prob, 'label' : label}
@@ -154,8 +134,8 @@ class  ModelInterface(pl.LightningModule):
             model = MlpMixer(input_dim=1024, hidden_dim=512, scale=512)
 
         elif model.lower() == 'dsmil':
-            from models.dsmil import MILNet
-            model = MILNet(input_dimension=1024, hidden_dim=512, n_classes=2)
+            from models.dsmil import DSMIL
+            model = DSMIL(input_size=1024)
         elif model.lower() == 'clam_sb':
             from models.clam import CLAM_SB
             model = CLAM_SB()
