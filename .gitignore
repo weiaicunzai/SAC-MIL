@@ -250,3 +250,14 @@ sss_sigmoid
 sss_softmax
 sssss
 *.pt
+clam
+dsmil_test_cam16
+fix_grad_bug_no_inter_fc_2
+fix_grad_bug_no_inter_fc_3
+fix_grad_bug_no_inter_fc_4
+rand_like_all
+test_all
+test_mean
+test_mlpmixer
+test_mlpmixer_1
+test_two_layers
