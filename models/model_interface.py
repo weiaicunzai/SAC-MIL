@@ -127,12 +127,10 @@ class  ModelInterface(pl.LightningModule):
         if model.lower() == 'transmil':
             from models.transmil import TransMIL
             model = TransMIL(2)
-
         elif model.lower() == 'mixer':
             from models.mixer import MlpMixer
             # model = MlpMixer(input_dim=1024, hidden_dim=512, scale=32768)
             model = MlpMixer(input_dim=1024, hidden_dim=512, scale=512)
-
         elif model.lower() == 'dsmil':
             from models.dsmil import DSMIL
             model = DSMIL(input_size=1024)
@@ -142,6 +140,12 @@ class  ModelInterface(pl.LightningModule):
         elif model.lower() == 'clam_mb':
             from models.clam import CLAM_MB
             model = CLAM_MB()
+        elif model.lower() == 'abmil':
+            from models.abmil import ABMIL
+            model = ABMIL(input_size=1024)
+        elif model.lower() == 'mil':
+            from models.mil import MIL_fc_mc
+            model = MIL_fc_mc()
         else:
             raise ValueError("wrong model name")
         self.model = model

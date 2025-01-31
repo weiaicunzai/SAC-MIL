@@ -214,15 +214,15 @@ class TransMIL(nn.Module):
         self._fc1 = nn.Sequential(nn.Linear(1024, 512), nn.ReLU())
         # self.cls_token = nn.Parameter(torch.randn(1, 1, 512))
         self.n_classes = n_classes
-        # self.layer1 = TransLayer(dim=512)
-        # self.layer2 = TransLayer(dim=512)
+        self.layer1 = TransLayer(dim=512)
+        self.layer2 = TransLayer(dim=512)
         # def __init__(self, hidden_dim, k, region_size, use_pos, scale):
         # self.layer2 = IntraRegionK(512, k=64, region_size=64, use_pos=False, scale=512)
 
         self.k = 64
 
-        self.layer1 = IntraRegionKTest(512, k=self.k, region_size=self.k ** 1, use_pos=True, scale=512)
-        self.layer2 = IntraRegionKTest(512, k=self.k, region_size=self.k ** 2, use_pos=False, scale=512)
+        # self.layer1 = IntraRegionKTest(512, k=self.k, region_size=self.k ** 1, use_pos=True, scale=512)
+        # self.layer2 = IntraRegionKTest(512, k=self.k, region_size=self.k ** 2, use_pos=False, scale=512)
         # self.layer3 = IntraRegionKTest(512, k=self.k, region_size=self.k ** 2, use_pos=False, scale=512)
         # self.intra_region1 = IntraRegionK(hidden_dim, self.k, self.k ** 1, use_pos=True, scale=scale)
         # self.intra_region2 = IntraRegionK(hidden_dim, self.k, self.k ** 2, use_pos=False, scale=scale)
