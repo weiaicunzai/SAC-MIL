@@ -6,6 +6,7 @@ import random
 
 import h5py
 import torch
+import torch.nn as nn
 import numpy as np
 
 
@@ -270,7 +271,8 @@ def main():
 
     assert args.dataset in ['cam16', 'lung', 'brac']
 
-    h5_dir = os.path.join(data_root, args.dataset, 'feat_clam_resnet50', 'patch_size_256_at_mag_20', 'h5_files')
+    # h5_dir = os.path.join(data_root, args.dataset, 'feat_clam_resnet50', 'patch_size_256_at_mag_20', 'h5_files')
+    h5_dir = os.path.join(data_root, args.dataset, 'feat_clam_uni', 'patch_size_256_at_mag_20', 'h5_files')
 
     idx_path = os.path.join(data_root, args.dataset, 'idx_{}'.format(args.k))
     pos_path = os.path.join(data_root, args.dataset, 'pos')

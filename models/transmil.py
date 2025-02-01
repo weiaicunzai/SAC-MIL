@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from nystrom_attention import NystromAttention
-from models.mixer import IntraRegionK
 
 
 class TransLayer(nn.Module):
@@ -43,190 +42,16 @@ class PPEG(nn.Module):
         x = torch.cat((cls_token.unsqueeze(1), x), dim=1)
         return x
 
-import math
-class IntraRegionKTest(nn.Module):
-    def __init__(self, hidden_dim, k, region_size, use_pos, scale):
-        super().__init__()
-
-        self.k = k
-        self.region_size = region_size
-        layer_idx = math.log(self.region_size, self.k) - 1
-        self.scale = int(self.k ** layer_idx)
-        self.scale = int(self.k ** (math.log(self.region_size, self.k) - 1))
-        assert self.scale == int(self.k ** (math.log(self.region_size, self.k) - 1))
-
-        self.inter_fc = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-        )
-
-        if use_pos:
-            self.intra_fc = nn.Sequential(
-                    nn.Linear(hidden_dim, hidden_dim),
-                    nn.ReLU(),
-                    nn.Linear(hidden_dim, 1),
-                )
-        else:
-            self.intra_fc = nn.Sequential(
-                nn.Linear(hidden_dim, hidden_dim),
-            )
-
-        print(self.intra_fc)
-
-        self.norm1 = nn.LayerNorm(hidden_dim)
-
-        self.use_pos = use_pos
-        print('use_pos: ', self.use_pos)
-        if self.use_pos is True:
-            from models.pos import RotaryEmbedding as pos_emb
-            self.pos_emb = pos_emb(hidden_dim, scale=scale, mod=math.pi * 2)
-
-        self.hidden_dim = hidden_dim
-
-
-
-    def mixer_attn(self, x, pos):
-        res = x
-        x = self.norm1(x)
-
-        if self.use_pos:
-            # x = self.pos_emb.rotate_queries_or_keys(x, pos)
-            x = self.pos_emb(x, pos)
-
-        x = self.roll_all(x)
-        x = self.inter_fc(x)
-        x = self.unroll_all(x)
-        x = self.intra_fc(x)
-
-        if self.use_pos:
-            # x = x.softmax(dim=1)
-            # 87+
-            x = (x * res).sum(dim=1, keepdim=True)
-
-        x = res + x
-        return x
-
-
-    def forward(self, x, pos=None):
-
-
-        x = self.mixer_attn(x, pos)
-
-
-        return x
-
-    def split_parts(self, n):
-        if n < self.region_size:
-            return n
-
-        mod = n % self.region_size
-        num_part1 = n - mod
-
-        assert num_part1 > 0
-
-        return num_part1
-
-    def roll_all(self, x):
-        num_tokens = x.shape[1]
-
-        num_part1 = self.split_parts(num_tokens)
-
-        part1 = x[:, :num_part1, :]
-        part2 = x[:, num_part1:, :]
-
-        part1 = self.roll(part1)
-        part2 = self.roll(part2)
-
-        return torch.cat([part1, part2], dim=-2)
-
-    def unroll_all(self, x):
-        num_tokens = x.shape[1]
-
-        num_part1 = self.split_parts(num_tokens)
-
-        part1 = x[:, :num_part1, :]
-        part2 = x[:, num_part1:, :]
-
-        part1 = self.unroll(part1)
-        part2 = self.unroll(part2)
-
-        return torch.cat([part1, part2], dim=-2)
-
-    def unroll(self, x):
-        if x.shape[-2] == 0:
-            return x
-
-        B, L, D = x.shape
-
-        if L >= self.region_size:
-            x = x.view(B, -1, self.region_size, D)
-
-        x = x.split(
-            D // self.k,
-            dim=-1
-        )
-
-        res = []
-
-        for idx, chunk in enumerate(x):
-            chunk = torch.roll(chunk, -idx * self.scale, dims=-2)
-            res.append(chunk)
-
-        res = torch.cat(res, dim=-1)
-
-        if L >= self.region_size:
-            res = res.view(B, L, D)
-
-        return res
-
-    def roll(self, x):
-
-        if x.shape[-2] == 0:
-            return x
-
-        B, L, D = x.shape
-
-        if L >= self.region_size:
-            x = x.view(B, -1, self.region_size, D)
-
-        x = x.split(
-            D // self.k,
-            dim=-1
-        )
-
-        res = []
-        for idx, chunk in enumerate(x):
-            chunk = torch.roll(chunk, idx * self.scale, dims=-2)
-            res.append(chunk)
-
-        res = torch.cat(res, dim=-1)
-
-        if L >= self.region_size:
-            res = res.view(B, L, D)
-
-        return res
-
 
 class TransMIL(nn.Module):
     def __init__(self, n_classes):
         super(TransMIL, self).__init__()
-        # self.pos_layer = PPEG(dim=512)
+        self.pos_layer = PPEG(dim=512)
         self._fc1 = nn.Sequential(nn.Linear(1024, 512), nn.ReLU())
-        # self.cls_token = nn.Parameter(torch.randn(1, 1, 512))
+        self.cls_token = nn.Parameter(torch.randn(1, 1, 512))
         self.n_classes = n_classes
         self.layer1 = TransLayer(dim=512)
         self.layer2 = TransLayer(dim=512)
-        # def __init__(self, hidden_dim, k, region_size, use_pos, scale):
-        # self.layer2 = IntraRegionK(512, k=64, region_size=64, use_pos=False, scale=512)
-
-        self.k = 64
-
-        # self.layer1 = IntraRegionKTest(512, k=self.k, region_size=self.k ** 1, use_pos=True, scale=512)
-        # self.layer2 = IntraRegionKTest(512, k=self.k, region_size=self.k ** 2, use_pos=False, scale=512)
-        # self.layer3 = IntraRegionKTest(512, k=self.k, region_size=self.k ** 2, use_pos=False, scale=512)
-        # self.intra_region1 = IntraRegionK(hidden_dim, self.k, self.k ** 1, use_pos=True, scale=scale)
-        # self.intra_region2 = IntraRegionK(hidden_dim, self.k, self.k ** 2, use_pos=False, scale=scale)
-        # self.intra_region3 = IntraRegionK(hidden_dim, self.k, self.k ** 3, use_pos=False, scale=scale)
         self.norm = nn.LayerNorm(512)
         self._fc2 = nn.Linear(512, self.n_classes)
 
@@ -237,32 +62,28 @@ class TransMIL(nn.Module):
 
         h = self._fc1(h) #[B, n, 512]
 
-        print(h.shape)
-
         #---->pad
-        # H = h.shape[1]
-        # _H, _W = int(np.ceil(np.sqrt(H))), int(np.ceil(np.sqrt(H)))
-        # add_length = _H * _W - H
-        # h = torch.cat([h, h[:,:add_length,:]],dim = 1) #[B, N, 512]
+        H = h.shape[1]
+        _H, _W = int(np.ceil(np.sqrt(H))), int(np.ceil(np.sqrt(H)))
+        add_length = _H * _W - H
+        h = torch.cat([h, h[:,:add_length,:]],dim = 1) #[B, N, 512]
 
         #---->cls_token
-        # B = h.shape[0]
-        # cls_tokens = self.cls_token.expand(B, -1, -1).cuda()
-        # h = torch.cat((cls_tokens, h), dim=1)
+        B = h.shape[0]
+        cls_tokens = self.cls_token.expand(B, -1, -1).cuda()
+        h = torch.cat((cls_tokens, h), dim=1)
 
         #---->Translayer x1
         h = self.layer1(h) #[B, N, 512]
 
         #---->PPEG
-        # h = self.pos_layer(h, _H, _W) #[B, N, 512]
+        h = self.pos_layer(h, _H, _W) #[B, N, 512]
 
         #---->Translayer x2
         h = self.layer2(h) #[B, N, 512]
 
-        h = h.mean(dim=1)
         #---->cls_token
-        # h = self.norm(h)[:,0]
-        h = self.norm(h)
+        h = self.norm(h)[:,0]
 
         #---->predict
         logits = self._fc2(h) #[B, n_classes]

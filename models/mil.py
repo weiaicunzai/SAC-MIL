@@ -44,7 +44,7 @@ class MIL_fc(nn.Module):
 class MIL_fc_mc(nn.Module):
     def __init__(self, gate = True, size_arg = "small", dropout = False, n_classes = 2, top_k=1):
         super(MIL_fc_mc, self).__init__()
-        assert n_classes > 2
+        # assert n_classes > 2
         self.size_dict = {"small": [1024, 512]}
         size = self.size_dict[size_arg]
         fc = [nn.Linear(size[0], size[1]), nn.ReLU()]

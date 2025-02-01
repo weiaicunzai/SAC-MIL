@@ -13,7 +13,7 @@ def load_loggers(log_root, dataset_name, fold):
 
     log_path = os.path.join(log_root, dataset_name, fold, TIME_NOW)
     print('log_path', log_path)
-    os.makedirs(log_path)
+    os.makedirs(log_path, exist_ok=True)
 
     #---->TensorBoard
     tb_logger = pl_loggers.TensorBoardLogger(log_path,
