@@ -371,7 +371,6 @@ mixer_lung_fold3_res50.log
 mixer_lung_fold4
 mixer_lung_fold4_res50.log
 mlpmixer_resnet50_brac_lung
-run_all.py
 transmil__fold0.log
 transmil__fold0_res50.log
 transmil__fold1.log
