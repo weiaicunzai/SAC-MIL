@@ -23,6 +23,7 @@ def make_parse():
     parser.add_argument('--model', type=str, required=True, default='mixer')
     parser.add_argument('--ckpt', type=str)
     args = parser.parse_args()
+    print(args)
     return args
 
 #---->main
