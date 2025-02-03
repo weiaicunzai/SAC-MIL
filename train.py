@@ -28,6 +28,7 @@ def make_parse():
 
 #---->main
 def main(args):
+    return
 
     #---->Initialize seed
     pl.seed_everything(2023)
