@@ -1,4 +1,5 @@
 import os
+import subprocess
 
 def generate_params():
     models = [
@@ -20,7 +21,7 @@ def generate_params():
             for f_id in fold:
                 yield mod, ds, f_id
 
-N = 4
+N = 8
 from queue import Queue
 gpu_queue = Queue(maxsize=N)
 for i in range(N):
@@ -28,19 +29,38 @@ for i in range(N):
 
 def train_model(i):
     mod, ds, f_id = i
-    print("Training fold {} of dataset {} with model {}".format(mod, ds, f_id))
-    model_file = "{}_{}_fold{}".format(mod, ds, f_id)
+    model_file = "{}_{}_fold{}_res50".format(mod, ds, f_id)
     gpu_id = gpu_queue.get()
+    print("Training fold {} of dataset {} with model {} on gpu {}".format(f_id, ds, mod, gpu_id))
     try:
-        os.system(
-            'python train.py --stage=train   --gpus={gpu}  --fold={f_id}   --dataset={ds} --model={mod} &> {model_file}'.format(
-                gpu=gpu_id,
-                f_id=f_id,
-                ds=ds,
-                mod=mod,
-                model_file=model_file
+        # 使用 subprocess.run 替代 os.system
+        with open(model_file, 'w') as f:
+            result = subprocess.run(
+                [
+                    'python', 'train.py',
+                    '--stage=train',
+                    '--gpus={}'.format(gpu_id),
+                    '--fold={}'.format(f_id),
+                    '--dataset={}'.format(ds),
+                    '--model={}'.format(mod)
+                ],
+                stdout=f,
+                stderr=subprocess.STDOUT  # 将 stderr 重定向到 stdout
             )
-        )
+
+        # 检查子进程是否成功完成
+        if result.returncode != 0:
+            print(f"Training failed for {mod} on {ds} fold {f_id}")
+    # try:
+    #     os.system(
+    #         'python train.py --stage=train   --gpus={gpu}  --fold={f_id}   --dataset={ds} --model={mod} &> {model_file}'.format(
+    #             gpu=gpu_id,
+    #             f_id=f_id,
+    #             ds=ds,
+    #             mod=mod,
+    #             model_file=model_file
+    #         )
+    #     )
     finally:
         # 释放 GPU ID
         gpu_queue.put(gpu_id)
