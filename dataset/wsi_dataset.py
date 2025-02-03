@@ -39,6 +39,8 @@ class WSIDataset(data.Dataset):
 
         self.data_set = data_set
 
+        self.tmp_data = {}
+
 
 
     def get_wsis(self, data_set, fold):
@@ -71,6 +73,14 @@ class WSIDataset(data.Dataset):
 
         return wsis
 
+    def get_data(self, full_path):
+        features = self.tmp_data.get(full_path, None)
+
+        if features is None:
+            features = torch.load(full_path)
+
+        return features
+
     def __len__(self):
         return len(self.wsis.keys())
 
@@ -80,7 +90,8 @@ class WSIDataset(data.Dataset):
         full_path = os.path.join(self.feat_dir, '{}.pt'.format(slide_id))
         # print(full_path)
 
-        features = torch.load(full_path)
+        # features = torch.load(full_path)
+        features = self.get_data(full_path)
 
 
         idx = torch.load(os.path.join(self.idx, slide_id + '.pt')).long()

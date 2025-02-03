@@ -44,12 +44,11 @@ class WSIDataModule(pl.LightningDataModule):
         if stage == 'test' or stage is None:
             self.test_dataset = WSIDataset(self.data_root, state='test', fold=self.fold)
 
-
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=1, num_workers=1, shuffle=True)
+        return DataLoader(self.train_dataset, batch_size=1, num_workers=0, shuffle=True)
 
     def val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size=1, num_workers=1, shuffle=False)
+        return DataLoader(self.val_dataset, batch_size=1, num_workers=0, shuffle=False)
 
     def test_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size=1, num_workers=1, shuffle=False)
+        return DataLoader(self.test_dataset, batch_size=1, num_workers=0, shuffle=False)
