@@ -9,9 +9,10 @@ import pytorch_lightning as pl
 class  ModelInterface(pl.LightningModule):
 
     #---->init
-    def __init__(self, model, debug):
+    def __init__(self, model, feat, debug):
         super(ModelInterface, self).__init__()
         self.save_hyperparameters()
+        self.feat = feat
         self.load_model(model)
         self.loss = nn.CrossEntropyLoss()
         self.optimizer = self.configure_optimizers()
@@ -124,25 +125,33 @@ class  ModelInterface(pl.LightningModule):
 
 
     def load_model(self, model):
+        if self.feat == 'uni':
+            # input_dim = 384
+            input_dim = 1024
+        elif self.feat == 'res50':
+            input_dim = 1024
+        else:
+            raise ValueError('wrong value')
+
         if model.lower() == 'transmil':
             from models.transmil import TransMIL
-            model = TransMIL(2)
+            model = TransMIL(input_dim=input_dim, n_classes=2)
         elif model.lower() == 'mixer':
             from models.mixer import MlpMixer
             # model = MlpMixer(input_dim=1024, hidden_dim=512, scale=32768)
-            model = MlpMixer(input_dim=1024, hidden_dim=512, scale=512)
+            model = MlpMixer(input_dim=input_dim, hidden_dim=512, scale=512)
         elif model.lower() == 'dsmil':
             from models.dsmil import DSMIL
-            model = DSMIL(input_size=1024)
+            model = DSMIL(input_size=input_dim, n_classes=2)
         elif model.lower() == 'clam_sb':
             from models.clam import CLAM_SB
-            model = CLAM_SB()
+            model = CLAM_SB(input_dim=input_dim, n_classes=2)
         elif model.lower() == 'clam_mb':
             from models.clam import CLAM_MB
-            model = CLAM_MB()
+            model = CLAM_MB(input_dim=input_dim, n_classes=2)
         elif model.lower() == 'abmil':
             from models.abmil import ABMIL
-            model = ABMIL(input_size=1024)
+            model = ABMIL(input_size=input_dim)
         elif model.lower() == 'mil':
             from models.mil import MIL_fc_mc
             model = MIL_fc_mc()
@@ -151,8 +160,6 @@ class  ModelInterface(pl.LightningModule):
         self.model = model
 
         print(self.model)
-
-
 
 
     def on_after_backward(self):
@@ -196,8 +203,6 @@ class  ModelInterface(pl.LightningModule):
                         )
             self.last_logged_step_hist = self.global_step
 
-
-
         # print(self.global_step, self.last_logged_step_act, self.log_activations_every)
         """在反向传播之后记录激活值直方图"""
         if (self.global_step - self.last_logged_step_act) >= self.log_activations_every:
@@ -209,8 +214,6 @@ class  ModelInterface(pl.LightningModule):
                 )
 
             self.last_logged_step_act = self.global_step
-
-
 
     def _register_activation_hooks(self):
         """为每一层注册前向传播钩子"""

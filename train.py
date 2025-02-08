@@ -22,6 +22,7 @@ def make_parse():
     parser.add_argument('--dataset', type=str, required=True)
     parser.add_argument('--model', type=str, required=True, default='mixer')
     parser.add_argument('--ckpt', type=str)
+    parser.add_argument('--feat', type=str, required=True)
     args = parser.parse_args()
     print(args)
     return args
@@ -40,11 +41,22 @@ def main(args):
 
     #---->Define Data
     data_root = '/data/smb/syh/WSI_cls/'
-    dataset_root = os.path.join(data_root, args.dataset)
-    dm = WSIDataModule(fold=args.fold, dataset_path=dataset_root)
+
+    if args.feat not in ['uni', 'res50']:
+        raise ValueError(
+            'wrong value'
+        )
+
+    if args.feat == 'uni':
+        feat_ext = 'feat_clam_uni'
+    elif args.feat == 'res50':
+        feat_ext = 'feat_clam_resnet50'
+
+    dataset_root = os.path.join(data_root, args.dataset, feat_ext)
+    dm = WSIDataModule(fold=args.fold, dataset_path=dataset_root, dataset=args.dataset)
 
     #---->Define Model
-    model = ModelInterface(model=args.model, debug=True)
+    model = ModelInterface(model=args.model, feat=args.feat, debug=True)
 
     #---->Instantiate Trainer
     trainer = Trainer(

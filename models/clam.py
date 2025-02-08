@@ -73,12 +73,12 @@ args:
     instance_loss_fn: loss function to supervise instance-level training
     subtyping: whether it's a subtyping problem
 """
-import copy
 class CLAM_SB(nn.Module):
-    def __init__(self, gate = True, size_arg = "small", dropout = False, k_sample=8, n_classes=2,
+    def __init__(self, input_dim=512, gate = True, size_arg = "small", dropout = False, k_sample=8, n_classes=2,
         instance_loss_fn=nn.CrossEntropyLoss(), subtyping=False):
         super(CLAM_SB, self).__init__()
-        self.size_dict = {"small": [1024, 512, 256], "big": [1024, 512, 384]}
+        # self.size_dict = {"small": [1024, 512, 256], "big": [1024, 512, 384]}
+        self.size_dict = {"small": [input_dim, 512, 256], "big": [input_dim, 512, 384]}
 
         size = self.size_dict[size_arg]
         fc = [nn.Linear(size[0], size[1]), nn.ReLU()]
@@ -216,10 +216,11 @@ class CLAM_SB(nn.Module):
         return results_dict
 
 class CLAM_MB(CLAM_SB):
-    def __init__(self, gate = True, size_arg = "small", dropout = False, k_sample=8, n_classes=2,
+    def __init__(self, input_dim, gate = True, size_arg = "small", dropout = False, k_sample=8, n_classes=2,
         instance_loss_fn=nn.CrossEntropyLoss(), subtyping=False):
         nn.Module.__init__(self)
-        self.size_dict = {"small": [1024, 512, 256], "big": [1024, 512, 384]}
+        # self.size_dict = {"small": [1024, 512, 256], "big": [1024, 512, 384]}
+        self.size_dict = {"small": [input_dim, 512, 256], "big": [input_dim, 512, 384]}
         size = self.size_dict[size_arg]
         fc = [nn.Linear(size[0], size[1]), nn.ReLU()]
         if dropout:

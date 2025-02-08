@@ -3,23 +3,25 @@ import subprocess
 
 def generate_params():
     models = [
-        'dsmil',
-        'transmil',
-        'abmil',
-        'mixer',
-        'clam_sb',
-        'clam_sb'
+        # 'dsmil',
+        # 'transmil',
+        # 'abmil',
+        # 'mixer',
+        # 'clam_sb',
+        'clam_mb'
     ]
 
     # ds={"brac", "lung"}
     # datasets=("brac" "lung")
     datasets = ['brac', 'lung']
     fold = [0, 1, 2, 3, 4]
+    feat_type = ['uni', 'res50']
 
     for mod in models:
         for ds in datasets:
-            for f_id in fold:
-                yield mod, ds, f_id
+            for feat in feat_type:
+                for f_id in fold:
+                    yield mod, ds, f_id, feat
 
 N = 8
 from queue import Queue
@@ -28,10 +30,10 @@ for i in range(N):
     gpu_queue.put(i)  # 初始化队列，放入 GPU ID
 
 def train_model(i):
-    mod, ds, f_id = i
-    model_file = "{}_{}_fold{}_res50".format(mod, ds, f_id)
+    mod, ds, f_id, feat = i
+    model_file = "{}_{}_fold{}_{}".format(mod, ds, f_id, feat)
     gpu_id = gpu_queue.get()
-    print("Training fold {} of dataset {} with model {} on gpu {}".format(f_id, ds, mod, gpu_id))
+    print("Training fold {} of dataset {} with model {} on gpu {} using {} feature".format(f_id, ds, mod, gpu_id, feat))
     try:
         # 使用 subprocess.run 替代 os.system
         with open(model_file, 'w') as f:
@@ -42,7 +44,8 @@ def train_model(i):
                     '--gpus={}'.format(gpu_id),
                     '--fold={}'.format(f_id),
                     '--dataset={}'.format(ds),
-                    '--model={}'.format(mod)
+                    '--model={}'.format(mod),
+                    '--feat={}'.format(feat),
                 ],
                 stdout=f,
                 stderr=subprocess.STDOUT  # 将 stderr 重定向到 stdout
@@ -50,7 +53,7 @@ def train_model(i):
 
         # 检查子进程是否成功完成
         if result.returncode != 0:
-            print(f"Training failed for {mod} on {ds} fold {f_id}")
+            print(f"Training failed for {mod} on {ds} fold {f_id} feat {feat}")
     # try:
     #     os.system(
     #         'python train.py --stage=train   --gpus={gpu}  --fold={f_id}   --dataset={ds} --model={mod} &> {model_file}'.format(
@@ -66,7 +69,7 @@ def train_model(i):
         gpu_queue.put(gpu_id)
 
 from multiprocessing.pool import ThreadPool
-pool = ThreadPool(processes=8)
+pool = ThreadPool(processes=N)
 pool.map(train_model, generate_params())
 
 

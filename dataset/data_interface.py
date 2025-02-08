@@ -5,7 +5,7 @@ from dataset import WSIDataset
 
 class WSIDataModule(pl.LightningDataModule):
 
-    def __init__(self, dataset_path, fold):
+    def __init__(self, dataset_path, fold, dataset):
         """[summary]
 
         Args:
@@ -17,6 +17,7 @@ class WSIDataModule(pl.LightningDataModule):
 
         self.data_root = dataset_path
         self.fold = fold
+        self.dataset_name = dataset
 
     def prepare_data(self):
         # 1. how to download
@@ -37,12 +38,12 @@ class WSIDataModule(pl.LightningDataModule):
         """
         # Assign train/val datasets for use in dataloaders
         if stage == 'fit' or stage is None:
-            self.train_dataset = WSIDataset(self.data_root, state='train', fold=self.fold)
-            self.val_dataset = WSIDataset(self.data_root, state='test', fold=self.fold)
+            self.train_dataset = WSIDataset(self.data_root, state='train', fold=self.fold, dataset=self.dataset_name)
+            self.val_dataset = WSIDataset(self.data_root, state='test', fold=self.fold, dataset=self.dataset_name)
 
         # Assign test dataset for use in dataloader(s)
         if stage == 'test' or stage is None:
-            self.test_dataset = WSIDataset(self.data_root, state='test', fold=self.fold)
+            self.test_dataset = WSIDataset(self.data_root, state='test', fold=self.fold, dataset=self.dataset_name)
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=1, num_workers=0, shuffle=True)

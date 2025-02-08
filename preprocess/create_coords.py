@@ -272,10 +272,12 @@ def main():
     assert args.dataset in ['cam16', 'lung', 'brac']
 
     # h5_dir = os.path.join(data_root, args.dataset, 'feat_clam_resnet50', 'patch_size_256_at_mag_20', 'h5_files')
-    h5_dir = os.path.join(data_root, args.dataset, 'feat_clam_uni', 'patch_size_256_at_mag_20', 'h5_files')
+    feat_ext = 'feat_clam_uni'
+    # feat_ext = 'feat_clam_resnet50'
+    h5_dir = os.path.join(data_root, args.dataset, feat_ext, 'patch_size_256_at_mag_20', 'h5_files')
 
-    idx_path = os.path.join(data_root, args.dataset, 'idx_{}'.format(args.k))
-    pos_path = os.path.join(data_root, args.dataset, 'pos')
+    idx_path = os.path.join(data_root, args.dataset, feat_ext, 'idx_{}'.format(args.k))
+    pos_path = os.path.join(data_root, args.dataset, feat_ext, 'pos')
     os.makedirs(idx_path, exist_ok=True)
     os.makedirs(pos_path, exist_ok=True)
     for h5_path in glob.iglob(os.path.join(h5_dir, '**', '*.h5'), recursive=True):

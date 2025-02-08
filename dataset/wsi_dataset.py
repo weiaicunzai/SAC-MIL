@@ -6,7 +6,7 @@ import pandas as pd
 import torch.utils.data as data
 
 class WSIDataset(data.Dataset):
-    def __init__(self, data_root, state, fold):
+    def __init__(self, data_root, state, fold, dataset):
         super().__init__()
         # Set all input args as attributes
         self.data_root = data_root
@@ -15,10 +15,11 @@ class WSIDataset(data.Dataset):
 
         self.feat_dir = os.path.join(
             self.data_root,
-                'feat_clam_resnet50',
+                # 'feat_clam_resnet50',
                 'patch_size_256_at_mag_20',
                 'pt_files'
             )
+
         self.idx = os.path.join(
             self.data_root,
             "idx_64"
@@ -29,17 +30,23 @@ class WSIDataset(data.Dataset):
             'pos'
         )
 
-        dataset_name = os.path.basename(self.data_root)
+        # dataset_name = os.path.basename(self.data_root)
+        dataset_name = dataset
         self.file_list_csv = os.path.join('dataset_csv', 'dataset_list', dataset_name, '{}.csv'.format(dataset_name))
         self.split_dir = os.path.join('dataset_csv', 'splits',  dataset_name)
         wsis = self.get_wsis(data_set, fold)
         self.wsis = wsis
         self.slide_names = list(self.wsis.keys())
 
-
         self.data_set = data_set
 
         self.tmp_data = {}
+
+        # for idx in range(len(self)):
+        #     slide_id = self.slide_names[idx]
+        #     # label = self.wsis[slide_id]
+        #     full_path = os.path.join(self.feat_dir, '{}.pt'.format(slide_id))
+        #     self.get_data(full_path)
 
 
 
@@ -73,12 +80,21 @@ class WSIDataset(data.Dataset):
 
         return wsis
 
+    def dict2tensor(self, features):
+        assert isinstance(features, dict)
+        return torch.tensor(list(features.values()))
+
     def get_data(self, full_path):
         features = self.tmp_data.get(full_path, None)
+        # print('start loading...')
 
         if features is None:
             features = torch.load(full_path)
+            if isinstance(features, dict):
+                features = self.dict2tensor(features)
+            self.tmp_data[full_path] = features
 
+        # print('done loading.......')
         return features
 
     def __len__(self):
@@ -97,12 +113,40 @@ class WSIDataset(data.Dataset):
         idx = torch.load(os.path.join(self.idx, slide_id + '.pt')).long()
         pos = torch.load(os.path.join(self.pos, slide_id + '.pt'))
 
-        features = features[idx]
-        pos = pos[idx]
+
+        pos_len = pos.shape[0]
+        feat_len = features.shape[0]
+        if pos_len > feat_len:
+            # print('>>')
+            pos = pos[:feat_len]
+        else:
+            # print('<<')
+            # print('before')
+            # print(pos.shape, pos[:feat_len - pos_len].shape, pos_len, feat_len)
+            # pos = torch.cat([pos, pos[:feat_len - pos_len]], dim=0)
+
+            repeat_times = feat_len // pos_len
+            remainder = feat_len % pos_len
+
+            # 重复 pos 并拼接
+            pos = torch.cat([pos] * repeat_times + [pos[:remainder]], dim=0)
+            # print(pos.shape)
+
+        features = features.clone()
+        # print(os.path.join(self.idx, slide_id + '.pt'))
+        # print(full_path)
+        # print(pos_len, feat_len)
+
+
+        # features = features[idx]
+        # pos = pos[idx]
 
         # print(full_path)
         # print(os.path.join(self.pos, slide_id + '.pt'))
         # print(pos.shape, features.shape)
+
+        # print(pos.shape, features.shape)
+        assert pos.shape[0] == features.shape[0]
         if self.data_set == 'train':
             index = [x for x in range(features.shape[0])]
             random.shuffle(index)
