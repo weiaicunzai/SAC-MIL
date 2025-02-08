@@ -23,7 +23,8 @@ def generate_params():
                 for f_id in fold:
                     yield mod, ds, f_id, feat
 
-N = 8
+
+N = 4
 from queue import Queue
 gpu_queue = Queue(maxsize=N)
 for i in range(N):

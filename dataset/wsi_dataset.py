@@ -110,7 +110,7 @@ class WSIDataset(data.Dataset):
         features = self.get_data(full_path)
 
 
-        idx = torch.load(os.path.join(self.idx, slide_id + '.pt')).long()
+        # idx = torch.load(os.path.join(self.idx, slide_id + '.pt')).long()
         pos = torch.load(os.path.join(self.pos, slide_id + '.pt'))
 
 
@@ -153,4 +153,5 @@ class WSIDataset(data.Dataset):
             features = features[index]
             pos = pos[index]
 
+        assert pos.shape[0] == features.shape[0]
         return features, pos, label
