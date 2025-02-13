@@ -126,8 +126,8 @@ class  ModelInterface(pl.LightningModule):
 
     def load_model(self, model):
         if self.feat == 'uni':
-            # input_dim = 384
-            input_dim = 1024
+            input_dim = 384
+            # input_dim = 1024
         elif self.feat == 'res50':
             input_dim = 1024
         else:

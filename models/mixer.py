@@ -5,7 +5,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-from models.pos import RotaryEmbedding
+# from models.pos import RotaryEmbedding
 
 
 class MlpMixer(nn.Module):
@@ -326,3 +326,33 @@ class IntraRegionK(nn.Module):
             res = res.view(B, L, D)
 
         return res
+
+
+if __name__ == '__main__':
+    # net = MlpMixer(input_dim=1024, hidden_dim=512, num_classes=2, scale=512)
+    inputs = torch.randn(1, 10000, 1024)
+    print(inputs)
+
+    hidden_dim = 1024
+    k = 64
+    scale = 512
+
+    net1 = nn.Sequential(
+        IntraRegionK(hidden_dim, k, k ** 1, use_pos=False, scale=scale),
+        IntraRegionK(hidden_dim, k, k ** 2, use_pos=False, scale=scale),
+        IntraRegionK(hidden_dim, k, k ** 3, use_pos=False, scale=scale),
+    )
+    net1 = net1.eval()
+
+    with torch.inference_mode():
+        out = net1(inputs)
+
+    inputs1 = inputs.clone()
+    inputs1[:, 5000, :] = 0
+
+    with torch.inference_mode():
+        out1 = net1(inputs1)
+
+    diff = (out - out1).sum(dim=-1)
+    # print((out - out1).sum(dim=-1))
+    print((diff == 0).sum())
