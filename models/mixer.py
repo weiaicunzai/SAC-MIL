@@ -28,6 +28,9 @@ class MlpMixer(nn.Module):
         self.fc2 = nn.Linear(hidden_dim, self.num_classes)
 
     def forward(self, data):
+        b,d,h,w=data.shape
+        data=data.view(b,d,h*w)
+        data=data.permute(0,2,1) # [B, n, d]
         x=data[...,0:1024]
         pos=data[...,1024:]
         x=x.float()
@@ -47,7 +50,7 @@ class MlpMixer(nn.Module):
 
         Y_prob = F.softmax(logits, dim = 1)
         results_dict = {'logits': logits, 'Y_prob': Y_prob}
-
+        return Y_prob
         return results_dict
 
 class IntraAttn(nn.Module):
