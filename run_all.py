@@ -3,19 +3,20 @@ import subprocess
 
 def generate_params():
     models = [
-        # 'dsmil',
-        # 'transmil',
-        # 'abmil',
-        # 'mixer',
-        # 'clam_sb',
+        'dsmil',
+        'transmil',
+        'abmil',
+        'mixer',
+        'clam_sb',
         'clam_mb'
     ]
 
     # ds={"brac", "lung"}
     # datasets=("brac" "lung")
-    datasets = ['brac', 'lung']
-    fold = [0, 1, 2, 3, 4]
-    feat_type = ['uni', 'res50']
+    datasets = ['cam16']
+    # fold = [0, 1, 2, 3, 4]
+    fold = [0]
+    feat_type = ['uni']
 
     for mod in models:
         for ds in datasets:
