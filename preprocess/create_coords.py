@@ -228,38 +228,6 @@ def gen_color():
         random.randint(0, 255)
     )
 
-# def draw_points(img_dir, h5_path, coords, color):
-#     basename = os.path.basename(h5_path)
-#     basename = basename.replace('h5', 'tif')
-
-#     img_path = os.path.join(img_dir, basename)
-
-#     wsi = openslide.OpenSlide(img_path)
-
-#     level = 5
-#     dims = wsi.level_dimensions[level]
-#     downsample_factor = wsi.level_downsamples[level]
-
-#     # dims = dims / downsample_factor
-#     img = wsi.read_region((0, 0), level, dims).convert('RGB')
-#     img = np.array(img)
-#     img = img[:, :, ::-1]
-
-#     # print(type(img), img[33, 3])
-#     # print(img.shape, img.dtype)
-#     for coord in coords:
-#         coord = coord / downsample_factor
-#         # print(type(coord))
-#         coord = coord.tolist()
-#         coord = [int(c) for c in coord]
-#         # coord = [30, 30]
-#         # img = np.zeros((400, 400, 3), np.uint8)
-#         cv2.circle(img, coord, 3, color, 3)
-
-#     # print(img.max())
-#     # print(img.shape, img.dtype)
-#     return img
-
 def main():
 
     parser = argparse.ArgumentParser()

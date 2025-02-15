@@ -3,6 +3,7 @@ import os
 import sys
 import math
 from itertools import cycle
+from typing import Union
 
 sys.path.append(os.getcwd())
 
@@ -154,13 +155,21 @@ def draw_points(img_path, coords, k):
 
 #     return output
 
+def showArrayOrTensor(t:Union[np.ndarray|torch.Tensor],tag=""):
+    if isinstance(t,torch.Tensor):
+        print(f"tag:{tag}, size:{t.shape}, type:{t.dtype}, device:{t.device}")
+    elif isinstance(t,np.ndarray):
+        print(f"tag:{tag}, size:{t.shape}, type:{t.dtype}")
+    else:
+        print(f"Tag({tag}) is {type(t)}, it's not a array or tensor!")
+    
 def main():
 
     parser = argparse.ArgumentParser()
     # Required parameters
     parser.add_argument("--data_root", default='/data/smb/syh/WSI_cls/')
-    parser.add_argument('--dataset', required=True, type=str)
-    parser.add_argument('--k', required=True, type=int)
+    parser.add_argument('--dataset', default='cam16', type=str)
+    parser.add_argument('--k', default=64, type=int)
     args = parser.parse_args()
 
     assert args.dataset in ['cam16', 'brac', 'lung']
@@ -185,6 +194,13 @@ def main():
         img_path = os.path.join(img_dir, slide)
         img, img_org = draw_points(img_path, coords, args.k)
 
+        showArrayOrTensor(img,'img') 
+        showArrayOrTensor(idx,'idx')
+        showArrayOrTensor(coords,'coords')
+        showArrayOrTensor(slide,'slide')
+        print( h5_path)
+        
+        input("pause")
 
 
         cv2.imwrite('tmp/{}.jpg'.format(slide_id), img)

@@ -27,11 +27,13 @@ class MlpMixer(nn.Module):
 
         self.fc2 = nn.Linear(hidden_dim, self.num_classes)
 
-    def forward(self, **kwargs):
+    def forward(self, data):
+        x=data[...,0:1024]
+        pos=data[...,1024:]
+        x=x.float()
+        # x = kwargs['data'].float() #[B, n, 1024]
 
-        x = kwargs['data'].float() #[B, n, 1024]
-
-        pos = kwargs['pos']
+        # pos = kwargs['pos']
 
         x = self.fc1(x)
 
@@ -330,7 +332,7 @@ class IntraRegionK(nn.Module):
 
 if __name__ == '__main__':
     # net = MlpMixer(input_dim=1024, hidden_dim=512, num_classes=2, scale=512)
-    inputs = torch.randn(1, 10000, 1024)
+    inputs = torch.randn( 10000, 1024)
     print(inputs)
 
     hidden_dim = 1024
@@ -356,3 +358,5 @@ if __name__ == '__main__':
     diff = (out - out1).sum(dim=-1)
     # print((out - out1).sum(dim=-1))
     print((diff == 0).sum())
+    model=MlpMixer(input_dim=1024, hidden_dim=512, scale=512, num_classes=2)
+    outs=model(inputs)
