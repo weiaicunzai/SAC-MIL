@@ -79,16 +79,17 @@ def get_wsi_mixer():
 
 def main():
     N = 128 * 128
+
     inputs = torch.randn(1, N, 1024)
-    # print(inputs)
 
     # net1 = get_wsi_mixer()
     # net1 = get_cylemlp()
     net1 = get_chordmixer()
     net1 = net1.eval()
 
-    # inputs = inputs.view(1, 128, 128, -1)
 
+
+    # inputs = inputs.view(1, 128, 128, -1)
 
     with torch.inference_mode():
         out = net1(inputs)
@@ -104,14 +105,14 @@ def main():
     with torch.inference_mode():
         out1 = net1(inputs1)
 
-    # print(out.shape, out1.shape)
     out = out.view(1, N, -1)
     out1 = out1.view(1, N, -1)
     diff = (out - out1).sum(dim=-1)
-    # print((out - out1).sum(dim=-1))
+
+
     print('diff: ', diff.shape)
     print(diff)
-    print('diff sum:', (diff == 0).sum())
+    print('numer of tokens that does not change:', (diff == 0).sum())
 
 
 if __name__ == '__main__':
