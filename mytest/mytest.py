@@ -180,7 +180,7 @@ def get_net3():
 if __name__ == '__main__':
     # main()
     N = 128 * 128
-    total=200
+    total=10
     for i in range(total):
         torch.manual_seed(i)
         input=torch.randn(1,N,1024)
