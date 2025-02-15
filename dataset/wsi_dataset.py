@@ -100,6 +100,15 @@ class WSIDataset(data.Dataset):
     def __len__(self):
         return len(self.wsis.keys())
 
+    # def __getitem__(self, idx):
+    #     slide_id = self.slide_names[idx]
+    #     label = self.wsis[slide_id]
+    #     full_path = os.path.join(self.feat_dir, '{}.pt'.format(slide_id))
+
+    #     features = self.get_data(full_path)
+
+    #     return features, 1, label
+
     def __getitem__(self, idx):
         slide_id = self.slide_names[idx]
         label = self.wsis[slide_id]
@@ -110,42 +119,21 @@ class WSIDataset(data.Dataset):
         features = self.get_data(full_path)
 
 
-        # idx = torch.load(os.path.join(self.idx, slide_id + '.pt')).long()
+        idx = torch.load(os.path.join(self.idx, slide_id + '.pt')).long()
         pos = torch.load(os.path.join(self.pos, slide_id + '.pt'))
+        # pos_len = pos.shape[0]
+        # feat_len = features.shape[0]
+        # if pos_len > feat_len:
+        #     pos = pos[:feat_len]
+        # else:
+        #     repeat_times = feat_len // pos_len
+        #     remainder = feat_len % pos_len
 
-
-        pos_len = pos.shape[0]
-        feat_len = features.shape[0]
-        if pos_len > feat_len:
-            # print('>>')
-            pos = pos[:feat_len]
-        else:
-            # print('<<')
-            # print('before')
-            # print(pos.shape, pos[:feat_len - pos_len].shape, pos_len, feat_len)
-            # pos = torch.cat([pos, pos[:feat_len - pos_len]], dim=0)
-
-            repeat_times = feat_len // pos_len
-            remainder = feat_len % pos_len
-
-            # 重复 pos 并拼接
-            pos = torch.cat([pos] * repeat_times + [pos[:remainder]], dim=0)
-            # print(pos.shape)
+        #     # 重复 pos 并拼接
+        #     pos = torch.cat([pos] * repeat_times + [pos[:remainder]], dim=0)
 
         features = features.clone()
-        # print(os.path.join(self.idx, slide_id + '.pt'))
-        # print(full_path)
-        # print(pos_len, feat_len)
 
-
-        # features = features[idx]
-        # pos = pos[idx]
-
-        # print(full_path)
-        # print(os.path.join(self.pos, slide_id + '.pt'))
-        # print(pos.shape, features.shape)
-
-        # print(pos.shape, features.shape)
         assert pos.shape[0] == features.shape[0]
         if self.data_set == 'train':
             index = [x for x in range(features.shape[0])]

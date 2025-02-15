@@ -1,5 +1,6 @@
 third_party
 wsi_cls
+third_party
 **/*.pyc
 *.npz
 **/__pycache__/**
