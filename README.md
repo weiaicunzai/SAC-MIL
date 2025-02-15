@@ -5,9 +5,13 @@ DATSET_NAME: support 3 dataset names, cam16, brac, lung
 Training:
 
 ```
-python train.py --stage='train'   --gpus=3 --fold=0   --dataset=DATASET_NAME --model='mixer'
+python train.py --stage='train'   --gpus=3 --fold=0   --dataset=DATASET_NAME --model='mixer'  --feat res50
 ```
 
+Eval:
+```
+python train.py --stage='test'   --gpus=3 --fold=0   --dataset='cam16' --model='mixer' --ckpt   'epoch=130-val_acc=0.8730.ckpt' --feat res50
+```
 
 Generate Normalized Position:
 ```
