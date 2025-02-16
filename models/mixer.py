@@ -31,6 +31,10 @@ class MlpMixer(nn.Module):
 
         x = kwargs['data'].float() #[B, n, 1024]
 
+        half_length = x.shape[1] // 2
+        # x[:, half_length, :] = 0
+        # print((x.sum(dim=-1) == 0).sum())
+
         pos = kwargs['pos']
 
         x = self.fc1(x)
@@ -39,12 +43,20 @@ class MlpMixer(nn.Module):
         x = self.intra_region2(x, pos)
         x = self.intra_region3(x, pos)
 
+        feat_layer = x
+        # length = x.shape[1]
+        # torch.save(feat_layer, '/data/smb/syh/WSI_cls/cam16/draw/mlp_mixer/{}_zero_center.pt'.format(length))
+
+        # print(x.max(), x.min(), x.mean(), x.std())
+        test = x.sum(dim=-1, keepdim=True)
+        F.softmax(test, dim=-2)
+
         x = x.mean(dim=-2)
 
         logits = self.fc2(x)
 
         Y_prob = F.softmax(logits, dim = 1)
-        results_dict = {'logits': logits, 'Y_prob': Y_prob}
+        results_dict = {'logits': logits, 'Y_prob': Y_prob, 'feat_layer': feat_layer}
 
         return results_dict
 
