@@ -25,7 +25,7 @@ y_values = [
 ]
 # 定义每条线的颜色和对应的图例名称
 colors = ['#B393FA', '#69FA7F', '#FAB369']
-line_names = ['Cycle-MLP', 'Chord-Mixer', 'WSI-Mixer']
+line_names = ['Cycle-MLP', 'Chord-Mixer', 'SAC-MIL']
 
 # 创建图表和坐标轴
 fig, ax = plt.subplots(figsize=(8, 4))

@@ -530,3 +530,14 @@ dsmil_cam16_fold0_uni
 *.ckpt
 mixer_cam16_fold0_uni
 transmil_cam16_fold0_uni
+abmil_*
+baseline*
+clam*
+.run1.sh.swp
+.run2.sh.swo
+.run2.sh.swp
+env1
+env2
+env3
+fff.py
+mytest/*.pdf
